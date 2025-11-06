@@ -7,7 +7,7 @@ import sys
 # ========== 配置区域 ==========
 API_KEY = os.getenv("TWITTER_API_KEY", "")
 USERNAMES = ["karminski3", "lijigang_com", "op7418"]
-CHECK_INTERVAL_HOURS = 2
+CHECK_INTERVAL_HOURS = 4
 OUTPUT_DIR = "tweets_data"
 LOG_DIR = "logs"
 LAST_CHECK_FILE = ".last_check_time"

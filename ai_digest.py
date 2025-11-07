@@ -31,12 +31,14 @@ from typing import List, Optional, Sequence, Tuple
 
 import requests
 
+BASE_DIR = Path(__file__).resolve().parent
+
 # ---------------------------------------------------------------------------
 # 基本配置：通过环境变量覆写默认值，方便接入不同的 OpenAI 兼容服务。
 # ---------------------------------------------------------------------------
 AI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://ai.shuocier.com/v1")
 AI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-AI_MODEL = os.getenv("OPENAI_MODEL", "deepseek-chat")
+AI_MODEL = os.getenv("OPENAI_MODEL", "claude-sonnet-4-5-20250929")
 
 DEFAULT_QUICK_PROMPT = textwrap.dedent(
     """
@@ -449,13 +451,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--tweets-dir",
         type=Path,
-        default=Path("tweets_data"),
+        default=BASE_DIR / "tweets_data",
         help="查找推文数据文件的目录",
     )
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("ai_reports"),
+        default=BASE_DIR / "ai_reports",
         help="摘要 Markdown 的输出目录",
     )
     parser.add_argument(

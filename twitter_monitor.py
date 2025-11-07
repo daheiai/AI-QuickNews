@@ -3,27 +3,29 @@ import json
 from datetime import datetime, timedelta, timezone
 import os
 import sys
+from pathlib import Path
 
 # ========== 配置区域 ==========
 API_KEY = os.getenv("TWITTER_API_KEY", "")
-USERNAMES = ["karminski3", "lijigang_com", "op7418"]
+USERNAMES = ["karminski3","op7418", "Alibaba_Qwen", "dotey", "arena", "MiniMax__AI", "KwaiAICoder","Zai_org","JustinLin610","lmstudio","oran_ge","deepseek_ai","OpenRouterAI","imxiaohu","AnthropicAI","OpenAI","huggingface"]
 CHECK_INTERVAL_HOURS = 4
-OUTPUT_DIR = "tweets_data"
-LOG_DIR = "logs"
-LAST_CHECK_FILE = ".last_check_time"
+BASE_DIR = Path(__file__).resolve().parent
+OUTPUT_DIR = BASE_DIR / "tweets_data"
+LOG_DIR = BASE_DIR / "logs"
 # ==============================
 
 API_URL = "https://api.twitterapi.io/twitter/tweet/advanced_search"
 BEIJING_TZ = timezone(timedelta(hours=8))
+MAX_PAGES = int(os.getenv("TWITTER_MAX_PAGES", "10"))
 
 def log(message):
-    os.makedirs(LOG_DIR, exist_ok=True)
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
     now = datetime.now(BEIJING_TZ)
-    log_file = f"{LOG_DIR}/log_{now.strftime('%Y-%m-%d')}.log"
+    log_file = LOG_DIR / f"log_{now.strftime('%Y-%m-%d')}.log"
     timestamp = now.strftime('%Y-%m-%d %H:%M:%S')
     log_msg = f"[{timestamp}] {message}"
     print(log_msg)
-    with open(log_file, "a", encoding="utf-8") as f:
+    with log_file.open("a", encoding="utf-8") as f:
         f.write(log_msg + "\n")
 
 def fetch_tweets(since_time):
@@ -39,8 +41,14 @@ def fetch_tweets(since_time):
     params = {"query": query, "queryType": "Latest", "cursor": ""}
 
     all_tweets = []
+    pages = 0
     try:
         while True:
+            pages += 1
+            if pages > MAX_PAGES:
+                log(f"分页超过上限 {MAX_PAGES}，停止继续请求。")
+                break
+
             response = requests.get(API_URL, headers=headers, params=params, timeout=30)
             log(f"API响应状态: {response.status_code}")
 
@@ -54,46 +62,45 @@ def fetch_tweets(since_time):
 
             if not data.get("has_next_page"):
                 break
-            params["cursor"] = data.get("next_cursor", "")
+            next_cursor = data.get("next_cursor")
+            if not next_cursor:
+                log("API 返回 has_next_page=True 但没有 next_cursor，停止。")
+                break
+            if next_cursor == params.get("cursor"):
+                log("检测到 cursor 未变化，可能进入循环，停止。")
+                break
+            params["cursor"] = next_cursor
     except Exception as e:
         log(f"请求异常: {e}")
         return None
 
     return all_tweets
 
-def get_last_check_time():
-    if os.path.exists(LAST_CHECK_FILE):
-        with open(LAST_CHECK_FILE, "r") as f:
-            return f.read().strip()
+def build_since_time() -> str:
     utc_time = datetime.now(timezone.utc) - timedelta(hours=CHECK_INTERVAL_HOURS)
     return utc_time.strftime("%Y-%m-%d_%H:%M:%S_UTC")
-
-def save_last_check_time():
-    utc_time = datetime.now(timezone.utc)
-    with open(LAST_CHECK_FILE, "w") as f:
-        f.write(utc_time.strftime("%Y-%m-%d_%H:%M:%S_UTC"))
 
 def save_tweets(tweets):
     if not tweets:
         return 0
 
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     now = datetime.now(BEIJING_TZ)
     year_month = now.strftime("%Y-%m")
     year_week = now.strftime("%Y-W%W")
     date = now.strftime("%Y-%m-%d")
 
-    monthly_file = f"{OUTPUT_DIR}/tweets_{year_month}.jsonl"
-    weekly_file = f"{OUTPUT_DIR}/tweets_{year_week}.jsonl"
-    daily_file = f"{OUTPUT_DIR}/tweets_{date}.jsonl"
-    latest_file = f"{OUTPUT_DIR}/tweets_latest.jsonl"
+    monthly_file = OUTPUT_DIR / f"tweets_{year_month}.jsonl"
+    weekly_file = OUTPUT_DIR / f"tweets_{year_week}.jsonl"
+    daily_file = OUTPUT_DIR / f"tweets_{date}.jsonl"
+    latest_file = OUTPUT_DIR / "tweets_latest.jsonl"
 
     existing_ids = set()
     for file in [monthly_file, weekly_file, daily_file]:
-        if os.path.exists(file):
+        if file.exists():
             try:
-                with open(file, "r", encoding="utf-8") as f:
+                with file.open("r", encoding="utf-8") as f:
                     for line in f:
                         if line.strip():
                             existing_ids.add(json.loads(line)["id"])
@@ -105,14 +112,14 @@ def save_tweets(tweets):
     if new_tweets:
         for file in [monthly_file, weekly_file, daily_file]:
             try:
-                with open(file, "a", encoding="utf-8") as f:
+                with file.open("a", encoding="utf-8") as f:
                     for tweet in new_tweets:
                         f.write(json.dumps(tweet, ensure_ascii=False) + "\n")
             except Exception as e:
                 log(f"写入文件 {file} 出错: {e}")
 
     try:
-        with open(latest_file, "w", encoding="utf-8") as f:
+        with latest_file.open("w", encoding="utf-8") as f:
             for tweet in tweets:
                 f.write(json.dumps(tweet, ensure_ascii=False) + "\n")
     except Exception as e:
@@ -124,8 +131,8 @@ def main():
     log("=" * 50)
     log("程序开始运行")
 
-    since_time = get_last_check_time()
-    log(f"抓取 {since_time} 之后的推文")
+    since_time = build_since_time()
+    log(f"抓取近 {CHECK_INTERVAL_HOURS} 小时内（自 {since_time} 起）的推文")
 
     tweets = fetch_tweets(since_time)
 
@@ -135,14 +142,12 @@ def main():
 
     if not tweets:
         log("没有新推文")
-        save_last_check_time()
         log("程序完成")
         return
 
     new_count = save_tweets(tweets)
     log(f"本次抓取 {len(tweets)} 条，新增 {new_count} 条")
 
-    save_last_check_time()
     log("程序完成")
 
 if __name__ == "__main__":

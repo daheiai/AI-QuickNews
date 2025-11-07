@@ -13,6 +13,8 @@ dist/
 build/
 
 # 数据文件
+data/sources/**/*
+data/events/*.jsonl
 data/tweets/*.jsonl
 data/reports/*.md
 data/logs/*.log

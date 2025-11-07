@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<opml version="2.0">
+	<head>
+		<title>All RSS Subscriptions for bestblogs.dev</title>
+	</head>
+	<body>
+		<outline text="量子位" title="量子位" type="rss" xmlUrl="https://www.qbitai.com/feed"/>
+		<outline text="Grafana Labs" title="Grafana Labs" type="rss" xmlUrl="https://grafana.com/categories/engineering/index.xml"/>
+		<outline text="宝玉的分享" title="宝玉的分享" type="rss" xmlUrl="https://baoyu.io/feed.xml"/>
+		<outline text="掘金本周最热" title="掘金本周最热" type="rss" xmlUrl="https://rsshub.bestblogs.dev/juejin/trending/all/weekly"/>
+		<outline text="deeplearning.ai" title="deeplearning.ai" type="rss" xmlUrl="https://rsshub.bestblogs.dev/deeplearning/the-batch"/>
+		<outline text="腾讯技术工程" title="腾讯技术工程" type="rss" xmlUrl="https://wechat2rss.bestblogs.dev/feed/1e0ac39f8952b2e7f0807313cf2633d25078a171.xml"/>
+		<outline text="ByteByteGo Newsletter" title="ByteByteGo Newsletter" type="rss" xmlUrl="https://blog.bytebytego.com/feed"/>
+		<outline text="Google Cloud Blog" title="Google Cloud Blog" type="rss" xmlUrl="https://cloudblog.withgoogle.com/rss/"/>
+		<outline text="Last Week in AI" title="Last Week in AI" type="rss" xmlUrl="https://lastweekin.ai/feed/"/>
+	</body>
+</opml>

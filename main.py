@@ -4,7 +4,7 @@ import datetime as dt
 import sys
 from pathlib import Path
 
-from src.collectors.twitter import TwitterCollector
+from src.collectors import RSSCollector, TwitterCollector
 from src.analyzer.digest import DigestAnalyzer
 from src.notifier.feishu import FeishuNotifier
 
@@ -15,10 +15,10 @@ def run_quick_mode():
     print("快讯模式启动")
     print("=" * 50)
 
-    # 1. 抓取推文
-    print("\n[1/3] 抓取推文...")
-    collector = TwitterCollector()
-    collector.run()
+    # 1. 抓取多信源数据
+    print("\n[1/3] 抓取多信源数据...")
+    TwitterCollector().run()
+    RSSCollector().run()
 
     # 2. 生成快讯
     print("\n[2/3] 生成 AI 快讯...")

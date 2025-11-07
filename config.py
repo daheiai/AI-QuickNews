@@ -1,7 +1,6 @@
 """统一配置管理模块"""
 import os
 from pathlib import Path
-from typing import List
 from dotenv import load_dotenv
 
 # 加载 .env 文件
@@ -12,14 +11,17 @@ BASE_DIR = Path(__file__).resolve().parent
 
 # 数据目录
 DATA_DIR = BASE_DIR / "data"
-TWEETS_DIR = DATA_DIR / "tweets"
+SOURCES_DIR = DATA_DIR / "sources"
+EVENTS_DIR = DATA_DIR / "events"
+TWITTER_DIR = SOURCES_DIR / "twitter"
+RSS_DIR = SOURCES_DIR / "rss"
+TWEETS_DIR = TWITTER_DIR  # 向后兼容旧路径
 REPORTS_DIR = DATA_DIR / "reports"
 LOGS_DIR = DATA_DIR / "logs"
 
 # 确保目录存在
-TWEETS_DIR.mkdir(parents=True, exist_ok=True)
-REPORTS_DIR.mkdir(parents=True, exist_ok=True)
-LOGS_DIR.mkdir(parents=True, exist_ok=True)
+for path in (SOURCES_DIR, EVENTS_DIR, TWITTER_DIR, RSS_DIR, REPORTS_DIR, LOGS_DIR):
+    path.mkdir(parents=True, exist_ok=True)
 
 # Twitter 配置
 TWITTER_API_KEY = os.getenv("TWITTER_API_KEY", "")
@@ -29,6 +31,12 @@ TWITTER_USERNAMES = os.getenv(
 ).split(",")    
 TWITTER_CHECK_INTERVAL_HOURS = int(os.getenv("TWITTER_CHECK_INTERVAL_HOURS", "4"))
 TWITTER_MAX_PAGES = int(os.getenv("TWITTER_MAX_PAGES", "10"))
+
+# RSS 配置
+RSS_OPML_PATH = Path(os.getenv("RSS_OPML_PATH", BASE_DIR / "resources/rss_feeds.opml"))
+RSS_LOOKBACK_HOURS = int(os.getenv("RSS_LOOKBACK_HOURS", "4"))
+RSS_MAX_ITEMS_PER_FEED = int(os.getenv("RSS_MAX_ITEMS_PER_FEED", "50"))
+RSS_REQUEST_TIMEOUT = int(os.getenv("RSS_REQUEST_TIMEOUT", "10"))
 
 # AI 模型配置
 OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "")

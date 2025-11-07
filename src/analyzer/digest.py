@@ -23,16 +23,78 @@ class ModeSettings:
     default_max_age: Optional[int]
 
 
+@dataclass
+class DigestOutput:
+    """运行结果产物"""
+    report_path: Path
+    primary_text: str
+    appendix_text: str
+
+
 DEFAULT_QUICK_PROMPT = textwrap.dedent("""
-你是一名 AI 速报员。请阅读最新抓取的推文，重点判断是否出现重大人工智能动态，
-包括但不限于：重量级模型或产品发布、突破性研究、行业安全/政策事件、重要融资
-或争议。如果没有重点消息，请明确说明"过去几小时暂无重大动态"。
+# 角色设定
+你是一名 AI 行业速报编辑，AI行业每天都有爆炸式的信息，而你擅长从中抓取到真正的价值。
+你的核心目标是输出「是否有重要动态」+「核心内容摘要」+「价值判断」。
 
-输出结构：
-1. 速报结论：一句话说明是否出现重要消息。
-2. 速报内容：如有重点，请列出核心内容并给出你的总结和判断，这条信息说明了什么？
+---
 
-语言以中文为主，可补充重要的英文关键词。除上面要求格式外，禁止提供其他冗余信息。
+# 判断逻辑（按优先级）
+1、新开源模型（关键词：release, Open source, 开源, 发布, SOTA ,Qwen,GLM 等开源模型发布或更新）
+2、商业大模型更新（关键词：ChatGPT, Claude, Gemini, Grok, Kimi, MiniMax等闭源模型动态）
+3、模型实测结论（关键词：对比, 跑测试, 实测, 差距, ）
+3、AI产品/工具发布与更新（关键词：API，推出，试玩, YouMind, Sora, Codex ，等AI工具动态）
+4、github开源项目（关键词：star, 工具, 开源, 分享, 爆火 ,含有github.com链接）
+5、提示词创新（出现prompt，实用性工具性的提示词模板）
+6、机器人/硬件相关（关键词：Boston Dynamics, Figure, Optimus ,树莓派 等）
+7、重大软件的更新（关键词：Chrome、Vscode等）
+                                
+
+只有推文中**直接提及或隐含这些事件行为**（发布、上线、开放、更新、宣布、推出）时，才视为“有动态”。
+额外信息：JustinLin610是Qwen团队的成员，他会说一些谜语，比如要有新东西来了。Hx1u0是Kimi团队的成员，会爆料一些有趣的开发故事。
+                                       
+
+---
+
+# 输出要求
+## 第一部分
+用一句话说明整体结论：
+- 如果没有检测到符合条件的内容，输出：“暂无重大动态。”
+- 如果检测到，输出：“有 X 条重要动态。”
+
+## 第二部分
+逐条总结：
+- 每条最多 5 行。
+- 信息量小的，用一句话概括，越精简越好不必换行。
+- 信息量大的，再用以下格式：
+
+一、事件标题（用一句话抓住主干）
+· 细节1：
+· 细节2：
+
+## 第三部分
+AI总结：针对以上内容做总结。 
+---
+
+# 语言要求
+- 全中文输出，但可保留必要的英文关键词。
+- 严禁出现“以下是结果”“我认为”等AI自述语。
+- 不得输出任何格式说明、推理过程或无关评论。
+- 再次精简，                            
+
+---
+
+# 示例输出
+有3条重要动态：
+一、Sora APP 安卓版正式上线，已在加、美、日等地区开放下载。
+
+二、Google 推出 File Search Tool 
+    ·产品形态：完全托管的 RAG 系统，内置于 Gemini API 
+    ·核心价值：将 RAG 简化为一行 API 调用，自动完成索引、向量嵌入与语义检索 
+    ·计费模式：仅首次建立索引收费（$0.15/100万tokens），后续查询免费 ·支持格式：PDF、Word、TXT、JSON、源代码等主流格式
+
+三、苹果新版 Siri 将由 Gemini 提供后台支持，预计 2026 年 3 月上线。
+
+AI总结：谷歌推出的工具会大幅降低企业级知识库部署门槛，RAG技术平民化。Sora朝着更广泛的用户群体进军，Siri抛弃OpenAI转向Gemini。
 """).strip()
 
 DEFAULT_DAILY_PROMPT = textwrap.dedent("""
@@ -94,7 +156,10 @@ class Tweet:
             return None
         for fmt in ("%a %b %d %H:%M:%S %z %Y", "%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%S"):
             try:
-                return dt.datetime.strptime(value, fmt)
+                parsed = dt.datetime.strptime(value, fmt)
+                if parsed.tzinfo is None:
+                    parsed = parsed.replace(tzinfo=dt.timezone.utc)
+                return parsed
             except (ValueError, TypeError):
                 continue
         return None
@@ -207,8 +272,8 @@ class DigestAnalyzer:
 
         return data["choices"][0]["message"]["content"].strip()
 
-    def save_report(self, summary: str, selected_tweets: Sequence[Tweet], heading: str) -> Path:
-        """保存报告"""
+    def save_report(self, summary: str, selected_tweets: Sequence[Tweet], heading: str) -> DigestOutput:
+        """生成并保存报告，同时返回飞书友好的文本"""
         now = dt.datetime.now()
         timestamp = now.strftime("%Y-%m-%d_%H%M")
 
@@ -223,7 +288,9 @@ class DigestAnalyzer:
             snippet = tweet.text.replace("\n", " ").strip()
             if len(snippet) > 50:
                 snippet = snippet[:50].rstrip() + "..."
-            appendix_lines.append(f"{idx}. [{tweet.author}] {snippet} (❤ {tweet.like_count}) {tweet.url}".rstrip())
+            appendix_lines.append(
+                f"{idx}. [{tweet.author}] {snippet} (❤ {tweet.like_count}) {tweet.url}".rstrip()
+            )
 
         content = f"""# {heading}
 
@@ -240,7 +307,117 @@ class DigestAnalyzer:
 {chr(10).join(appendix_lines)}
 """
         path.write_text(content.strip(), encoding="utf-8")
-        return path
+
+        primary_text = self._format_primary_text(summary, now)
+        appendix_text = self._format_appendix_text(appendix_lines, now)
+        return DigestOutput(report_path=path, primary_text=primary_text, appendix_text=appendix_text)
+
+    def _format_primary_text(self, summary: str, generated_at: dt.datetime) -> str:
+        header_label = "大黑4小时AI速报" if self.mode == "quick" else "大黑AI日报"
+        header = f"【{header_label}  时间：{generated_at.strftime('%Y-%m-%d %H:%M:%S')}】"
+
+        conclusion_section = self._extract_section(summary, "1. 速报结论")
+        if conclusion_section:
+            conclusion_lines = [ln.strip() for ln in conclusion_section.splitlines() if ln.strip()]
+            conclusion_raw = " ".join(conclusion_lines)
+        else:
+            conclusion_raw = summary.strip().split("\n", 1)[0]
+        conclusion_text = self._normalize_inline(conclusion_raw).strip()
+        if conclusion_text and "有重要动态" in conclusion_text and "：" not in conclusion_text.split("有重要动态", 1)[1][:2]:
+            conclusion_text = conclusion_text.replace("有重要动态", "有重要动态：", 1)
+        content_section = self._extract_section(summary, "2. 速报内容") or summary
+        content_text = self._convert_content_section(content_section)
+        content_lines = content_text.splitlines()
+        for idx, raw_line in enumerate(content_lines):
+            stripped_line = raw_line.strip()
+            if not stripped_line:
+                continue
+            if stripped_line == conclusion_text.strip():
+                content_text = "\n".join(content_lines[idx + 1:]).lstrip()
+            break
+
+        ending = "本时段速报完毕，请等待下一个4小时速报~" if self.mode == "quick" else "本期日报结束，感谢关注~"
+
+        parts = [header, conclusion_text, "", content_text.strip(), "", ending]
+        return "\n".join(part for part in parts if part is not None)
+
+    def _extract_section(self, markdown: str, title: str) -> str:
+        pattern = re.compile(rf"^##\s+{re.escape(title)}\s*$", re.MULTILINE)
+        match = pattern.search(markdown)
+        if not match:
+            return ""
+        start = match.end()
+        remainder = markdown[start:]
+        next_heading = re.search(r"^##\s+", remainder, re.MULTILINE)
+        end = start + next_heading.start() if next_heading else len(markdown)
+        return markdown[start:end].strip()
+
+    def _convert_content_section(self, markdown: str) -> str:
+        lines: List[str] = []
+        section_index = 0
+        for raw_line in markdown.splitlines():
+            line = raw_line.rstrip()
+            stripped = line.strip()
+            if not stripped:
+                lines.append("")
+                continue
+            if stripped.startswith("###"):
+                section_index += 1
+                numeral = self._section_index_to_cn(section_index)
+                title = stripped.lstrip("# ")
+                lines.append(f"{numeral}、{self._normalize_inline(title)}")
+                continue
+
+            indent = "  " if raw_line.startswith("  ") else ""
+            bullet_match = re.match(r"^([*-]|\d+\.)\s+", stripped)
+            prefix = None
+            if bullet_match:
+                stripped = stripped[len(bullet_match.group(0)) :]
+                prefix = f"{indent}· "
+            if stripped.startswith("**判断**"):
+                stripped = stripped.replace("**判断**", "AI判断", 1)
+
+            normalized = self._normalize_inline(stripped)
+            lines.append(f"{prefix}{normalized}" if prefix else normalized)
+
+        return "\n".join(self._collapse_blank_lines(lines))
+
+    @staticmethod
+    def _collapse_blank_lines(lines: Sequence[str]) -> List[str]:
+        cleaned: List[str] = []
+        prev_blank = False
+        for line in lines:
+            is_blank = not line.strip()
+            if is_blank and prev_blank:
+                continue
+            cleaned.append(line)
+            prev_blank = is_blank
+        return cleaned
+
+    @staticmethod
+    def _section_index_to_cn(index: int) -> str:
+        numerals = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十", "十一", "十二", "十三"]
+        if 1 <= index <= len(numerals):
+            return numerals[index - 1]
+        return str(index)
+
+    @staticmethod
+    def _normalize_inline(text: str) -> str:
+        text = text.replace("**", "")
+        text = re.sub(r"`(.+?)`", r"\\1", text)
+        text = re.sub(r"\[(.+?)\]\((.+?)\)", r"\\1（\\2）", text)
+        text = text.replace("#", "")
+        return text.strip()
+
+    def _format_appendix_text(self, appendix_lines: Sequence[str], generated_at: dt.datetime) -> str:
+        header = f"【速报附录  时间：{generated_at.strftime('%Y-%m-%d %H:%M:%S')}】"
+        intro = "以下为本次摘要引用的原始内容片段："
+        body = []
+        for line in appendix_lines:
+            normalized = self._normalize_inline(line)
+            normalized = normalized.replace("[", "").replace("]", "")
+            body.append(normalized)
+        return "\n".join([header, intro, "", *body])
 
     def find_latest_daily_file(self) -> Tuple[Path, str]:
         """查找最新的日报文件"""
@@ -305,10 +482,10 @@ class DigestAnalyzer:
         prompt = self.build_prompt(selected)
         summary = self.call_ai(prompt)
 
-        # 保存报告
-        report_path = self.save_report(summary, selected, heading)
-        print(f"[{self.mode}] 摘要已写入 {report_path}")
-        return report_path
+        # 保存报告并生成消息文本
+        output = self.save_report(summary, selected, heading)
+        print(f"[{self.mode}] 摘要已写入 {output.report_path}")
+        return output
 
 
 def main():

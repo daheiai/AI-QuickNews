@@ -25,15 +25,15 @@ LOGS_DIR.mkdir(parents=True, exist_ok=True)
 TWITTER_API_KEY = os.getenv("TWITTER_API_KEY", "")
 TWITTER_USERNAMES = os.getenv(
     "TWITTER_USERNAMES",
-    "karminski3,op7418,Alibaba_Qwen,dotey,arena,MiniMax__AI,KwaiAICoder,Zai_org,JustinLin610,lmstudio,oran_ge,deepseek_ai,OpenRouterAI,imxiaohu,AnthropicAI,OpenAI,huggingface"
-).split(",")
+    "Alibaba_Qwen,deepseek_ai"
+).split(",")    
 TWITTER_CHECK_INTERVAL_HOURS = int(os.getenv("TWITTER_CHECK_INTERVAL_HOURS", "4"))
 TWITTER_MAX_PAGES = int(os.getenv("TWITTER_MAX_PAGES", "10"))
 
 # AI 模型配置
-OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://ai.shuocier.com/v1")
+OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "claude-sonnet-4-5-20250929")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "deepseek-chat")
 
 # 飞书配置
 FEISHU_APP_ID = os.getenv("FEISHU_APP_ID", "")

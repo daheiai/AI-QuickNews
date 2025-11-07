@@ -1,6 +1,7 @@
 """Twitter 数据采集器"""
 import json
 import sys
+from collections import OrderedDict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import List, Optional
@@ -15,6 +16,8 @@ class TwitterCollector:
 
     API_URL = "https://api.twitterapi.io/twitter/tweet/advanced_search"
     BEIJING_TZ = timezone(timedelta(hours=8))
+    RECENT_IDS_FILENAME = "recent_ids.json"
+    RECENT_IDS_LIMIT = 5000
 
     def __init__(self):
         self.api_key = config.TWITTER_API_KEY
@@ -23,6 +26,48 @@ class TwitterCollector:
         self.max_pages = config.TWITTER_MAX_PAGES
         self.output_dir = config.TWEETS_DIR
         self.log_dir = config.LOGS_DIR
+        self.recent_ids_path = self.output_dir / self.RECENT_IDS_FILENAME
+        self.recent_ids = self._load_recent_ids()
+
+    def _load_recent_ids(self) -> "OrderedDict[str, None]":
+        """加载近期去重ID缓存"""
+        if not self.recent_ids_path.exists():
+            return OrderedDict()
+        try:
+            data = json.loads(self.recent_ids_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            self.log(f"recent_ids 文件损坏，忽略 {self.recent_ids_path}")
+            return OrderedDict()
+
+        if not isinstance(data, list):
+            return OrderedDict()
+
+        ids = OrderedDict()
+        for item in data[-self.RECENT_IDS_LIMIT:]:
+            if not item:
+                continue
+            ids[str(item)] = None
+        return ids
+
+    def _persist_recent_ids(self):
+        """写回近期ID缓存"""
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        payload = list(self.recent_ids.keys())[-self.RECENT_IDS_LIMIT:]
+        self.recent_ids_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    def _remember_ids(self, ordered_ids: List[str]):
+        """更新缓存，保留最近的若干ID用于去重"""
+        for tweet_id in ordered_ids:
+            if not tweet_id:
+                continue
+            if tweet_id in self.recent_ids:
+                self.recent_ids.move_to_end(tweet_id)
+            else:
+                self.recent_ids[tweet_id] = None
+            while len(self.recent_ids) > self.RECENT_IDS_LIMIT:
+                self.recent_ids.popitem(last=False)
+        if ordered_ids:
+            self._persist_recent_ids()
 
     def log(self, message: str):
         """记录日志"""
@@ -101,36 +146,44 @@ class TwitterCollector:
         daily_file = self.output_dir / f"tweets_{date}.jsonl"
         latest_file = self.output_dir / "tweets_latest.jsonl"
 
-        existing_ids = set()
-        for file in [monthly_file, weekly_file, daily_file]:
-            if file.exists():
-                try:
-                    with file.open("r", encoding="utf-8") as f:
-                        for line in f:
-                            if line.strip():
-                                existing_ids.add(json.loads(line)["id"])
-                except Exception as e:
-                    self.log(f"读取文件 {file} 出错: {e}")
+        batch_unique = []
+        new_archival = []
+        seen_ids = set()
+        skipped_known = 0
 
-        new_tweets = [t for t in tweets if t["id"] not in existing_ids]
+        for tweet in tweets:
+            tweet_id = str(tweet.get("id") or "")
+            if not tweet_id or tweet_id in seen_ids:
+                continue
+            seen_ids.add(tweet_id)
+            batch_unique.append(tweet)
+            if tweet_id in self.recent_ids:
+                skipped_known += 1
+                continue
+            new_archival.append(tweet)
 
-        if new_tweets:
+        self._remember_ids([str(t.get("id")) for t in batch_unique if t.get("id")])
+
+        if new_archival:
             for file in [monthly_file, weekly_file, daily_file]:
                 try:
                     with file.open("a", encoding="utf-8") as f:
-                        for tweet in new_tweets:
+                        for tweet in new_archival:
                             f.write(json.dumps(tweet, ensure_ascii=False) + "\n")
                 except Exception as e:
                     self.log(f"写入文件 {file} 出错: {e}")
 
         try:
             with latest_file.open("w", encoding="utf-8") as f:
-                for tweet in tweets:
+                for tweet in batch_unique:
                     f.write(json.dumps(tweet, ensure_ascii=False) + "\n")
         except Exception as e:
             self.log(f"写入latest文件出错: {e}")
 
-        return len(new_tweets)
+        if skipped_known and not new_archival:
+            self.log(f"这次抓取共 {len(batch_unique)} 条，但都是重复数据")
+
+        return len(new_archival)
 
     def run(self):
         """执行采集任务"""

@@ -1,12 +1,15 @@
 """飞书通知器"""
+import datetime as dt
 import json
+import re
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Sequence
 
 import requests
 
 import config
+from src.analyzer.digest import DigestAnalyzer
 
 
 class FeishuNotifier:
@@ -123,6 +126,52 @@ class FeishuNotifier:
         self.send_message(content, chat_id=chat_id)
         print(f"飞书消息发送成功，来源文件：{latest_path}")
 
+    def send_digest_messages(self, primary_text: str, appendix_text: str,
+                              mode: str = "quick", chat_id: Optional[str] = None):
+        """分两条消息发送正文与附录"""
+        self.send_message(primary_text, chat_id=chat_id)
+        self.send_message(appendix_text, chat_id=chat_id)
+        print(f"飞书消息发送成功（{mode}）：正文与附录已发送")
+
+    def send_latest_digest(self, mode: str, chat_id: Optional[str] = None):
+        """读取最新报告并按新版格式发送"""
+        prefix = "ai_quick" if mode == "quick" else "ai_daily"
+        latest_path = self.find_latest_report(prefix)
+        summary_text, appendix_lines, generated_at = self._extract_structured_report(latest_path)
+        analyzer = DigestAnalyzer(mode=mode)
+        primary_text = analyzer._format_primary_text(summary_text, generated_at)
+        appendix_text = analyzer._format_appendix_text(appendix_lines, generated_at)
+        self.send_digest_messages(primary_text, appendix_text, mode=mode, chat_id=chat_id)
+
+    def _extract_structured_report(self, path: Path):
+        """从 Markdown 报告中提取摘要、附录和时间"""
+        content = path.read_text(encoding="utf-8")
+        time_match = re.search(r"-\s*生成时间：(?P<ts>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})", content)
+        if time_match:
+            try:
+                generated_at = dt.datetime.strptime(time_match.group("ts"), "%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                generated_at = dt.datetime.now()
+        else:
+            generated_at = dt.datetime.now()
+
+        sections = re.split(r"\n---\n", content, maxsplit=2)
+        if len(sections) >= 3:
+            summary_text = sections[1].strip()
+            remainder = sections[2]
+        else:
+            summary_text = content.strip()
+            remainder = ""
+
+        appendix_match = re.search(r"##\s+附录：输入推文片段\s*\n+(.+)$", remainder, re.S)
+        if appendix_match:
+            appendix_block = appendix_match.group(1).strip()
+            appendix_lines = [line.rstrip() for line in appendix_block.splitlines() if line.strip()]
+        else:
+            appendix_lines = []
+
+        return summary_text, appendix_lines, generated_at
+
 
 def main():
     """命令行入口"""
@@ -132,7 +181,7 @@ def main():
     parser = argparse.ArgumentParser(description="飞书消息推送")
     parser.add_argument("--text", help="直接发送文本内容")
     parser.add_argument("--file", help="发送文件内容")
-    parser.add_argument("--mode", choices=["quick", "daily"], help="发送最新报告")
+    parser.add_argument("--mode", choices=["quick", "daily"], help="生成并发送最新报告（正文+附录）")
     parser.add_argument("--chat-id", help="指定接收消息的 chat_id")
     args = parser.parse_args()
 
@@ -147,7 +196,7 @@ def main():
             notifier.send_message(content, chat_id=args.chat_id)
             print(f"飞书消息发送成功，来源文件：{args.file}")
         elif args.mode:
-            notifier.send_report(args.mode, chat_id=args.chat_id)
+            notifier.send_latest_digest(mode=args.mode, chat_id=args.chat_id)
         else:
             print("必须提供 --text、--file 或 --mode", file=sys.stderr)
             sys.exit(1)

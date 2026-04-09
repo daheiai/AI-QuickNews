@@ -1,10 +1,10 @@
 # AI 信息聚合与推送系统
 
-自动抓取 Twitter AI 领域推文，通过 AI 生成摘要，并推送到飞书群聊的自动化系统。
+自动抓取 Twitter + RSS 等多信源的 AI 领域资讯，通过 AI 生成摘要，并推送到飞书群聊的自动化系统。
 
 ## 功能特性
 
-- 🐦 **多源采集**：支持 Twitter（可扩展 RSS 等其他信源）
+- 🐦 **多源采集**：内置 Twitter + RSS，灵活扩展其他信源
 - 🤖 **AI 分析**：使用大模型生成快讯和日报
 - 📱 **飞书推送**：自动推送到飞书群聊
 - ⏰ **定时任务**：支持 cron 定时执行
@@ -19,14 +19,15 @@
 ├── requirements.txt     # Python 依赖
 ├── .env.example         # 环境变量模板
 ├── src/                 # 源代码
-│   ├── collectors/      # 数据采集模块
-│   │   └── twitter.py   # Twitter 采集器
+│   ├── collectors/      # 数据采集模块（Twitter、RSS 等）
+│   ├── aggregator/      # 多信源聚合模块
 │   ├── analyzer/        # AI 分析模块
-│   │   └── digest.py    # 摘要分析器
 │   └── notifier/        # 通知模块
-│       └── feishu.py    # 飞书通知器
 ├── data/                # 数据目录
-│   ├── tweets/          # 推文数据
+│   ├── sources/
+│   │   ├── twitter/     # Twitter 原始归档
+│   │   └── rss/         # RSS 原始归档
+│   ├── events/          # 聚合后的统一事件
 │   ├── reports/         # AI 报告
 │   └── logs/            # 日志文件
 └── scripts/             # 部署脚本
@@ -78,8 +79,11 @@ python main.py --mode daily
 ### 4. 单独运行各模块
 
 ```bash
-# 仅抓取推文
+# 仅抓取 Twitter
 python -m src.collectors.twitter
+
+# 仅抓取 RSS
+python -m src.collectors.rss
 
 # 仅生成快讯
 python -m src.analyzer.digest --mode quick
@@ -123,6 +127,13 @@ source .env
 - `TWITTER_CHECK_INTERVAL_HOURS`：抓取时间间隔（默认 4 小时）
 - `TWITTER_MAX_PAGES`：最大分页数（默认 10）
 
+### RSS 配置
+
+- `RSS_OPML_PATH`：OPML 文件路径（默认 `resources/rss_feeds.opml`）
+- `RSS_LOOKBACK_HOURS`：只保留最近多少小时的内容（默认 4 小时）
+- `RSS_MAX_ITEMS_PER_FEED`：每个 RSS 最多抓取条数（默认 50）
+- `RSS_REQUEST_TIMEOUT`：单个 RSS 请求超时时间（秒，默认 10）
+
 ### AI 模型配置
 
 - `OPENAI_BASE_URL`：API 端点
@@ -139,22 +150,13 @@ source .env
 
 ## 扩展其他信源
 
-系统已预留扩展接口，添加新的信息源只需：
+新增信源时，只需：
 
-1. 在 `src/collectors/` 下创建新的采集器（如 `rss.py`）
-2. 实现 `run()` 方法，保存数据到 `data/tweets/` 目录
-3. 在 `main.py` 中调用新的采集器
+1. 在 `src/collectors/` 下实现新的采集器，将原始数据写入 `data/sources/<source-name>/`；
+2. 在 `EventAggregator` 中补充该信源的格式转换逻辑；
+3. 在 `main.py` 中串联采集器（或单独运行该模块）。
 
-示例：
-
-```python
-# src/collectors/rss.py
-class RSSCollector:
-    def run(self):
-        # 采集 RSS 数据
-        # 保存到 data/tweets/ 目录
-        pass
-```
+聚合后的统一 JSONL 位于 `data/events/`，分析器会自动读取所有来源并排序、去重。
 
 ## 常见问题
 

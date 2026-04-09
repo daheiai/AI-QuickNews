@@ -1,15 +1,15 @@
 """AI 摘要分析器"""
 import datetime as dt
-import json
 import re
 import textwrap
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Sequence, Tuple
+from typing import List, Optional, Sequence, Tuple, Union
 
 import requests
 
 import config
+from src.aggregator.events import EventAggregator
 
 
 @dataclass(frozen=True)
@@ -130,31 +130,47 @@ MODE_SETTINGS = {
 }
 
 
-class Tweet:
-    """推文数据结构"""
-    __slots__ = ("id", "url", "author", "author_handle", "created_at", "lang", "text",
-                 "like_count", "retweet_count", "reply_count", "quote_count", "bookmark_count")
+class Event:
+    """通用信源事件"""
+
+    __slots__ = (
+        "id",
+        "source",
+        "source_name",
+        "author",
+        "title",
+        "summary",
+        "content",
+        "url",
+        "published_at",
+        "score",
+    )
 
     def __init__(self, raw: dict):
         self.id = raw.get("id")
-        self.url = raw.get("url") or raw.get("twitterUrl")
-        author = raw.get("author") or {}
-        self.author = author.get("name") or author.get("userName") or "Unknown"
-        self.author_handle = author.get("userName") or author.get("screen_name", "")
-        self.created_at = self._parse_datetime(raw.get("createdAt"))
-        self.lang = raw.get("lang") or ""
-        self.text = (raw.get("text") or "").strip()
-        self.like_count = self._safe_int(raw.get("likeCount"))
-        self.retweet_count = self._safe_int(raw.get("retweetCount"))
-        self.reply_count = self._safe_int(raw.get("replyCount"))
-        self.quote_count = self._safe_int(raw.get("quoteCount"))
-        self.bookmark_count = self._safe_int(raw.get("bookmarkCount"))
+        self.source = raw.get("source") or "unknown"
+        self.source_name = raw.get("source_name") or self.source
+        self.author = raw.get("author") or self.source_name
+        self.title = (raw.get("title") or raw.get("summary") or "").strip()
+        self.summary = (raw.get("summary") or raw.get("content") or "").strip()
+        self.content = (raw.get("content") or self.summary).strip()
+        self.url = raw.get("url")
+        self.published_at = self._parse_datetime(raw.get("published_at"))
+        try:
+            self.score = float(raw.get("score") or 0)
+        except (TypeError, ValueError):
+            self.score = 0.0
 
     @staticmethod
     def _parse_datetime(value: Optional[str]) -> Optional[dt.datetime]:
         if not value:
             return None
-        for fmt in ("%a %b %d %H:%M:%S %z %Y", "%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%S"):
+        for fmt in (
+            "%Y-%m-%dT%H:%M:%S%z",
+            "%Y-%m-%dT%H:%M:%S",
+            "%a %b %d %H:%M:%S %z %Y",
+            "%Y-%m-%d %H:%M:%S",
+        ):
             try:
                 parsed = dt.datetime.strptime(value, fmt)
                 if parsed.tzinfo is None:
@@ -164,27 +180,18 @@ class Tweet:
                 continue
         return None
 
-    @staticmethod
-    def _safe_int(value: Optional[int]) -> int:
-        try:
-            return int(value or 0)
-        except (TypeError, ValueError):
-            return 0
-
-    @property
-    def engagement(self) -> float:
-        """互动度评分"""
-        return (self.like_count + 2.5 * self.retweet_count + 1.5 * self.reply_count +
-                1.2 * self.quote_count + 0.8 * self.bookmark_count)
-
     def short_repr(self) -> str:
-        """简短表示"""
-        created = self.created_at.strftime("%Y-%m-%d %H:%M") if self.created_at else ""
-        snippet = self.text.replace("\n", " ")
+        """构造 LLM 输入片段"""
+        timestamp = self.published_at.strftime("%Y-%m-%d %H:%M") if self.published_at else ""
+        snippet = self.content.replace("\n", " ")
         if len(snippet) > 240:
             snippet = snippet[:237] + "..."
-        return (f"[{self.author}] {created} | ❤ {self.like_count} 🔁 {self.retweet_count} 💬 {self.reply_count}\n"
-                f"{snippet}\n{self.url}")
+        return (
+            f"[{self.source_name}] {self.title or self.summary}\n"
+            f"时间：{timestamp}\n"
+            f"内容：{snippet}\n"
+            f"链接：{self.url}"
+        )
 
 
 class DigestAnalyzer:
@@ -193,51 +200,39 @@ class DigestAnalyzer:
     def __init__(self, mode: str = "quick"):
         self.mode = mode
         self.settings = MODE_SETTINGS[mode]
-        self.tweets_dir = config.TWEETS_DIR
         self.reports_dir = config.REPORTS_DIR
+        self.aggregator = EventAggregator()
 
-    def load_tweets(self, path: Path) -> List[Tweet]:
-        """加载推文"""
-        tweets = []
-        with path.open("r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    raw = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                if raw.get("type") != "tweet":
-                    continue
-                tweets.append(Tweet(raw))
-        return tweets
-
-    def filter_tweets(self, tweets: Sequence[Tweet], max_age_hours: Optional[int] = None,
-                     min_engagement: float = 0.0) -> List[Tweet]:
-        """过滤推文"""
+    def filter_events(self, events: Sequence[Event], max_age_hours: Optional[int] = None,
+                      min_score: float = 0.0) -> List[Event]:
+        """过滤事件"""
         now = dt.datetime.now(dt.timezone.utc)
         filtered = []
-        for tweet in tweets:
-            if max_age_hours and tweet.created_at:
-                age_hours = (now - tweet.created_at).total_seconds() / 3600
+        for event in events:
+            if max_age_hours and event.published_at:
+                age_hours = (now - event.published_at).total_seconds() / 3600
                 if age_hours > max_age_hours:
                     continue
-            if tweet.engagement < min_engagement:
+            if event.score < min_score:
                 continue
-            filtered.append(tweet)
+            filtered.append(event)
         return filtered
 
-    def select_top_tweets(self, tweets: Sequence[Tweet], limit: int) -> List[Tweet]:
-        """选择热度最高的推文"""
-        return sorted(tweets, key=lambda t: t.engagement, reverse=True)[:limit]
+    def select_top_events(self, events: Sequence[Event], limit: int) -> List[Event]:
+        """按照重要度排序"""
+        return sorted(events, key=lambda event: event.score, reverse=True)[:limit]
 
-    def build_prompt(self, tweets: Sequence[Tweet]) -> str:
+    def build_prompt(self, events: Sequence[Event]) -> str:
         """构建提示词"""
         parts = []
-        for idx, tweet in enumerate(tweets, start=1):
-            parts.append(f"{idx}. {tweet.short_repr()}")
-        return "\n\n".join(parts)
+        for idx, event in enumerate(events, start=1):
+            parts.append(
+                f"{idx}. 来源：{event.source_name}\n"
+                f"标题：{event.title}\n"
+                f"摘要：{event.summary}\n"
+                f"链接：{event.url}\n"
+            )
+        return "\n".join(parts)
 
     def call_ai(self, prompt: str) -> str:
         """调用 AI 模型"""
@@ -272,7 +267,7 @@ class DigestAnalyzer:
 
         return data["choices"][0]["message"]["content"].strip()
 
-    def save_report(self, summary: str, selected_tweets: Sequence[Tweet], heading: str) -> DigestOutput:
+    def save_report(self, summary: str, selected_events: Sequence[Event], heading: str) -> DigestOutput:
         """生成并保存报告，同时返回飞书友好的文本"""
         now = dt.datetime.now()
         timestamp = now.strftime("%Y-%m-%d_%H%M")
@@ -283,13 +278,16 @@ class DigestAnalyzer:
 
         path = self.reports_dir / f"{prefix}_{timestamp}.md"
 
-        appendix_lines = []
-        for idx, tweet in enumerate(selected_tweets, start=1):
-            snippet = tweet.text.replace("\n", " ").strip()
-            if len(snippet) > 50:
-                snippet = snippet[:50].rstrip() + "..."
-            appendix_lines.append(
-                f"{idx}. [{tweet.author}] {snippet} (❤ {tweet.like_count}) {tweet.url}".rstrip()
+        appendix_entries = []
+        for idx, event in enumerate(selected_events, start=1):
+            snippet = (event.summary or event.content).replace("\n", " ").strip()
+            if len(snippet) > 60:
+                snippet = snippet[:60].rstrip() + "..."
+            appendix_entries.append(
+                {
+                    "line": f"{idx}. [{event.source_name}] {snippet} {event.url}".rstrip(),
+                    "source": event.source,
+                }
             )
 
         content = f"""# {heading}
@@ -304,12 +302,12 @@ class DigestAnalyzer:
 
 ## 附录：输入推文片段
 
-{chr(10).join(appendix_lines)}
+{chr(10).join(entry['line'] for entry in appendix_entries)}
 """
         path.write_text(content.strip(), encoding="utf-8")
 
         primary_text = self._format_primary_text(summary, now)
-        appendix_text = self._format_appendix_text(appendix_lines, now)
+        appendix_text = self._format_appendix_text(appendix_entries, now)
         return DigestOutput(report_path=path, primary_text=primary_text, appendix_text=appendix_text)
 
     def _format_primary_text(self, summary: str, generated_at: dt.datetime) -> str:
@@ -409,22 +407,44 @@ class DigestAnalyzer:
         text = text.replace("#", "")
         return text.strip()
 
-    def _format_appendix_text(self, appendix_lines: Sequence[str], generated_at: dt.datetime) -> str:
+    def _format_appendix_text(self, appendix_entries: Sequence[Union[dict, str]],
+                              generated_at: dt.datetime) -> str:
         header = f"【速报附录  时间：{generated_at.strftime('%Y-%m-%d %H:%M:%S')}】"
         intro = "以下为本次摘要引用的原始内容片段："
-        body = []
-        for line in appendix_lines:
+        grouped = {"twitter": [], "rss": [], "other": []}
+        for entry in appendix_entries:
+            if isinstance(entry, dict):
+                source_key = entry.get("source") or "other"
+                line = entry.get("line", "")
+            else:
+                line = str(entry)
+                lower_line = line.lower()
+                if "twitter.com" in lower_line or "x.com" in lower_line:
+                    source_key = "twitter"
+                elif lower_line.startswith("http") or "http" in lower_line:
+                    source_key = "rss"
+                else:
+                    source_key = "other"
+                line = str(entry)
+            if source_key not in grouped:
+                grouped[source_key] = []
             normalized = self._normalize_inline(line)
             normalized = normalized.replace("[", "").replace("]", "")
-            body.append(normalized)
-        return "\n".join([header, intro, "", *body])
+            grouped[source_key].append(normalized)
 
-    def find_latest_daily_file(self) -> Tuple[Path, str]:
-        """查找最新的日报文件"""
-        latest_path = None
+        sections = [header, intro, ""]
+        if grouped.get("twitter"):
+            sections.extend(["【Twitter】", *grouped["twitter"], ""])
+        if grouped.get("rss"):
+            sections.extend(["【RSS】", *grouped["rss"], ""])
+        if grouped.get("other"):
+            sections.extend(["【其他来源】", *grouped["other"], ""])
+        return "\n".join(sections).rstrip()
+
+    def find_latest_available_date(self) -> str:
+        """查找已有数据的最近日期"""
         latest_date = None
-
-        for candidate in self.tweets_dir.glob("tweets_*.jsonl"):
+        for candidate in config.TWEETS_DIR.glob("tweets_*.jsonl"):
             match = re.match(r"tweets_(\d{4}-\d{2}-\d{2})\.jsonl$", candidate.name)
             if not match:
                 continue
@@ -434,56 +454,45 @@ class DigestAnalyzer:
                 continue
             if latest_date is None or current_date > latest_date:
                 latest_date = current_date
-                latest_path = candidate
 
-        if not latest_path or latest_date is None:
-            raise FileNotFoundError(f"未在 {self.tweets_dir} 找到符合命名格式的日报数据文件。")
+        if latest_date is None:
+            raise FileNotFoundError("未找到可用的历史数据文件")
 
-        return latest_path, latest_date.isoformat()
+        return latest_date.isoformat()
 
     def run(self, date: Optional[str] = None, limit: Optional[int] = None,
             max_age: Optional[int] = None):
         """执行分析任务"""
-        # 定位输入文件
         if self.mode == "quick":
-            source_file = self.tweets_dir / "tweets_latest.jsonl"
             target_date = None
-        else:  # daily
-            if date:
-                target_date = date
-                source_file = self.tweets_dir / f"tweets_{target_date}.jsonl"
-            else:
-                source_file, target_date = self.find_latest_daily_file()
+        else:
+            target_date = date or self.find_latest_available_date()
 
-        if not source_file.exists():
-            raise FileNotFoundError(f"找不到指定的输入文件：{source_file}")
+        raw_events, aggregated_path = self.aggregator.gather(date=target_date)
 
         # 准备标题
         heading = self.settings.heading
         if target_date and "{date}" in heading:
             heading = heading.replace("{date}", target_date)
 
-        # 加载和过滤推文
-        tweets = self.load_tweets(source_file)
+        events = [Event(item) for item in raw_events]
 
         if max_age is None:
             max_age = self.settings.default_max_age
 
-        tweets = self.filter_tweets(tweets, max_age_hours=max_age)
+        events = self.filter_events(events, max_age_hours=max_age)
 
-        if not tweets:
-            raise ValueError("没有符合筛选条件的推文，停止生成摘要。")
+        if not events:
+            raise ValueError("没有符合筛选条件的事件，停止生成摘要。")
 
-        # 选择推文
         limit = limit or self.settings.default_limit
-        selected = self.select_top_tweets(tweets, limit=min(limit, len(tweets)))
+        selected = self.select_top_events(events, limit=min(limit, len(events)))
 
-        # 生成摘要
         prompt = self.build_prompt(selected)
         summary = self.call_ai(prompt)
 
-        # 保存报告并生成消息文本
         output = self.save_report(summary, selected, heading)
+        print(f"[{self.mode}] 汇总数据来源：{aggregated_path}")
         print(f"[{self.mode}] 摘要已写入 {output.report_path}")
         return output
 

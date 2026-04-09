@@ -72,6 +72,68 @@ class FeishuNotifier:
         self._store_cached_token(token, expires_in)
         return token
 
+    def upload_image(self, image_path: Path) -> str:
+        """上传图片到飞书，返回 image_key"""
+        if not image_path.exists():
+            raise FileNotFoundError(f"图片文件不存在：{image_path}")
+
+        token = self.get_access_token()
+        url = "https://open.feishu.cn/open-apis/im/v1/images"
+        headers = {"Authorization": f"Bearer {token}"}
+
+        with open(image_path, "rb") as f:
+            files = {"image": (image_path.name, f, "image/png")}
+            data = {"image_type": "message"}
+            response = requests.post(url, headers=headers, files=files, data=data, timeout=30)
+
+        try:
+            result = response.json()
+        except ValueError:
+            raise RuntimeError(f"上传图片失败，响应无效：{response.text}")
+
+        if result.get("code") != 0:
+            raise RuntimeError(f"上传图片失败：{result}")
+
+        image_key = result.get("data", {}).get("image_key")
+        if not image_key:
+            raise RuntimeError(f"上传图片失败，未返回 image_key：{result}")
+
+        return image_key
+
+    def send_image(self, image_path: Path, chat_id: Optional[str] = None):
+        """发送图片消息"""
+        target_chat = chat_id or self.chat_id
+        if not target_chat:
+            raise RuntimeError("缺少目标 chat_id")
+
+        # 先上传图片
+        image_key = self.upload_image(image_path)
+
+        # 发送图片消息
+        token = self.get_access_token()
+        url = "https://open.feishu.cn/open-apis/im/v1/messages"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json; charset=utf-8",
+        }
+        payload = {
+            "receive_id": target_chat,
+            "msg_type": "image",
+            "content": json.dumps({"image_key": image_key}),
+        }
+        params = {"receive_id_type": "chat_id"}
+
+        response = requests.post(url, params=params, headers=headers, json=payload, timeout=15)
+        try:
+            data = response.json()
+        except ValueError:
+            data = {"raw": response.text}
+
+        if response.status_code != 200 or data.get("code") not in (None, 0):
+            raise RuntimeError(f"飞书发送图片失败：status={response.status_code}, response={data}")
+
+        print(f"图片发送成功：{image_path.name}")
+
     def send_message(self, text: str, chat_id: Optional[str] = None):
         """发送文本消息"""
         if not text.strip():

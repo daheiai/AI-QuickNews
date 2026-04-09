@@ -1,15 +1,137 @@
 """AI 摘要分析器"""
 import datetime as dt
+import json
 import re
 import textwrap
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 import requests
 
 import config
 from src.aggregator.events import EventAggregator
+
+
+# ============ 品牌配置（Logo 匹配）============
+# 关键词匹配采用大小写不敏感
+BRAND_KEYWORDS = {
+    # 主流大模型
+    "openai": ["openai", "gpt", "chatgpt", "sora", "dall-e", "dalle", "o1", "o3", "o4", "gpt-4", "gpt-5", "codex"],
+    "claude": ["claude", "anthropic"],
+    "deepseek": ["deepseek", "deep seek", "深度求索"],
+    "gemini": ["gemini", "bard"],
+    "gemma": ["gemma"],
+    "meta": ["meta ai", "llama", "meta llama"],
+    "mistral": ["mistral", "mixtral", "pixtral"],
+    "cohere": ["cohere", "command-r", "command r"],
+    "xai": ["xai", "x.ai", "grok"],
+
+    # 国内大模型
+    "qwen": ["qwen", "通义", "千问"],
+    "alibaba": ["alibaba", "阿里巴巴", "阿里云"],
+    "kimi": ["kimi", "moonshot", "月之暗面"],
+    "minimax": ["minimax", "海螺", "hailuo"],
+    "zhipu": ["zhipu", "智谱", "glm", "chatglm"],
+    "baidu": ["baidu", "百度", "ernie", "文心"],
+    "doubao": ["doubao", "豆包"],
+    "bytedance": ["bytedance", "字节跳动"],
+    "hunyuan": ["hunyuan", "混元", "腾讯"],
+    "spark": ["spark", "讯飞星火", "星火"],
+    "tiangong": ["tiangong", "天工", "昆仑万维"],
+
+    # 图像/视频生成
+    "stability": ["stability", "stable diffusion", "sdxl", "sd3"],
+    "midjourney": ["midjourney", "mj"],
+    "runway": ["runway", "gen-2", "gen-3", "gen2", "gen3"],
+    "pika": ["pika labs", "pika"],
+    "flux": ["flux", "black forest"],
+    "ideogram": ["ideogram"],
+    "pixverse": ["pixverse"],
+    "haiper": ["haiper"],
+    "viggle": ["viggle"],
+    "civitai": ["civitai"],
+    "novelai": ["novelai", "nai"],
+    "clipdrop": ["clipdrop"],
+
+    # 音频生成
+    "suno": ["suno"],
+    "udio": ["udio"],
+
+    # 开发工具
+    "github": ["github"],
+    "copilot": ["copilot", "github copilot"],
+    "cursor": ["cursor"],
+    "windsurf": ["windsurf", "codeium"],
+    "cline": ["cline"],
+    "manus": ["manus"],
+
+    # 平台/工具
+    "huggingface": ["huggingface", "hugging face", "hf"],
+    "ollama": ["ollama"],
+    "gradio": ["gradio"],
+    "langchain": ["langchain"],
+    "comfyui": ["comfyui", "comfy ui"],
+    "openwebui": ["open webui", "openwebui"],
+    "lmstudio": ["lm studio", "lmstudio"],
+    "vllm": ["vllm"],
+    "dify": ["dify"],
+    "coze": ["coze", "扣子"],
+    "n8n": ["n8n"],
+    "notion": ["notion"],
+    "notebooklm": ["notebooklm", "notebook lm"],
+    "mcp": ["model context protocol", "mcp server"],
+
+    # 云服务/硬件
+    "google": ["google", "deepmind"],
+    "nvidia": ["nvidia", "英伟达", "rtx", "h100", "h200", "b100", "b200", "blackwell"],
+    "microsoft": ["microsoft", "微软"],
+    "apple": ["apple ai", "苹果"],
+    "azure": ["azure"],
+    "cloudflare": ["cloudflare"],
+    "huawei": ["huawei", "华为", "昇腾"],
+
+    # API 聚合/推理平台
+    "openrouter": ["openrouter"],
+    "deepinfra": ["deepinfra"],
+    "fireworks": ["fireworks"],
+    "cerebras": ["cerebras"],
+    "siliconcloud": ["siliconcloud", "硅基流动"],
+
+    # 其他工具/产品
+    "bilibili": ["bilibili", "b站", "哔哩哔哩"],
+    "monica": ["monica"],
+    "youmind": ["youmind"],
+    "jina": ["jina"],
+    "tavily": ["tavily"],
+}
+
+# ============ 分区配置 ============
+CATEGORIES = {
+    "model": {
+        "name": "模型动态",
+        "keywords": ["模型", "model", "发布", "release", "开源", "open source", "sota", "更新", "update",
+                     "评测", "benchmark", "对比", "实测", "llm", "大模型", "参数", "训练", "微调", "fine-tune"],
+    },
+    "product": {
+        "name": "产品工具",
+        "keywords": ["产品", "工具", "tool", "app", "应用", "api", "sdk", "github", "开源项目", "star",
+                     "软件", "software", "chrome", "vscode", "plugin", "插件", "extension"],
+    },
+    "tutorial": {
+        "name": "技巧教程",
+        "keywords": ["prompt", "提示词", "教程", "tutorial", "技巧", "tips", "方法", "经验", "分享"],
+    },
+    "hardware": {
+        "name": "硬件动态",
+        "keywords": ["机器人", "robot", "硬件", "hardware", "芯片", "chip", "gpu", "tpu", "npu",
+                     "boston dynamics", "figure", "optimus", "树莓派", "nvidia", "英伟达"],
+    },
+    "industry": {
+        "name": "行业资讯",
+        "keywords": ["融资", "收购", "投资", "估值", "政策", "监管", "安全", "伦理", "合作", "战略"],
+    },
+}
 
 
 @dataclass(frozen=True)
@@ -47,19 +169,19 @@ DEFAULT_QUICK_PROMPT = textwrap.dedent("""
 5、提示词创新（出现prompt，实用性工具性的提示词模板）
 6、机器人/硬件相关（关键词：Boston Dynamics, Figure, Optimus ,树莓派 等）
 7、重大软件的更新（关键词：Chrome、Vscode等）
-                                
 
-只有推文中**直接提及或隐含这些事件行为**（发布、上线、开放、更新、宣布、推出）时，才视为“有动态”。
+
+只有推文中**直接提及或隐含这些事件行为**（发布、上线、开放、更新、宣布、推出）时，才视为"有动态"。
 额外信息：JustinLin610是Qwen团队的成员，他会说一些谜语，比如要有新东西来了。Hx1u0是Kimi团队的成员，会爆料一些有趣的开发故事。
-                                       
+
 
 ---
 
 # 输出要求
 ## 第一部分
 用一句话说明整体结论：
-- 如果没有检测到符合条件的内容，输出：“暂无重大动态。”
-- 如果检测到，输出：“有 X 条重要动态。”
+- 如果没有检测到符合条件的内容，输出："暂无重大动态。"
+- 如果检测到，输出："有 X 条重要动态。"
 
 ## 第二部分
 逐条总结：
@@ -72,14 +194,14 @@ DEFAULT_QUICK_PROMPT = textwrap.dedent("""
 · 细节2：
 
 ## 第三部分
-AI总结：针对以上内容做总结。 
+AI总结：针对以上内容做总结。
 ---
 
 # 语言要求
 - 全中文输出，但可保留必要的英文关键词。
-- 严禁出现“以下是结果”“我认为”等AI自述语。
+- 严禁出现"以下是结果""我认为"等AI自述语。
 - 不得输出任何格式说明、推理过程或无关评论。
-- 再次精简，                            
+- 再次精简，
 
 ---
 
@@ -87,14 +209,64 @@ AI总结：针对以上内容做总结。
 有3条重要动态：
 一、Sora APP 安卓版正式上线，已在加、美、日等地区开放下载。
 
-二、Google 推出 File Search Tool 
-    ·产品形态：完全托管的 RAG 系统，内置于 Gemini API 
-    ·核心价值：将 RAG 简化为一行 API 调用，自动完成索引、向量嵌入与语义检索 
+二、Google 推出 File Search Tool
+    ·产品形态：完全托管的 RAG 系统，内置于 Gemini API
+    ·核心价值：将 RAG 简化为一行 API 调用，自动完成索引、向量嵌入与语义检索
     ·计费模式：仅首次建立索引收费（$0.15/100万tokens），后续查询免费 ·支持格式：PDF、Word、TXT、JSON、源代码等主流格式
 
 三、苹果新版 Siri 将由 Gemini 提供后台支持，预计 2026 年 3 月上线。
 
 AI总结：谷歌推出的工具会大幅降低企业级知识库部署门槛，RAG技术平民化。Sora朝着更广泛的用户群体进军，Siri抛弃OpenAI转向Gemini。
+""").strip()
+
+# 新版快讯 Prompt - 输出 JSON 格式
+QUICK_JSON_PROMPT = textwrap.dedent("""
+# 角色设定
+你是一名 AI 行业速报编辑，擅长从海量信息中抓取有价值的内容并归类整理。
+
+# 内容分类
+1、model（模型动态）：模型发布、更新、评测、训练方法、性能对比
+2、product（产品工具）：AI产品、工具、GitHub项目、软件更新、新功能、API
+3、tutorial（技巧教程）：提示词、使用技巧、教程分享
+4、hardware（硬件动态）：机器人、芯片、硬件设备、GPU
+5、industry（行业资讯）：研究论文、安全报告、融资、政策、公司动态、合作
+
+# 判断标准
+- 有实质信息内容的推文都应该被收录
+- 多条相关推文可以合并为一条快讯（如同一主题的连续推文）
+- 过滤掉纯闲聊、表情回复、无实质内容的推文
+- 研究论文、安全报告属于 industry 分类
+
+额外信息：JustinLin610是Qwen团队成员，Hx1u0是Kimi团队成员。
+
+# 输出要求
+请严格按照以下 JSON 格式输出，不要输出任何其他内容：
+
+{
+  "summary": "2-3句话的整体总结，概括本期速报的核心亮点和重要动态",
+  "total": 3,
+  "items": [
+    {
+      "category": "model",
+      "title": "事件标题（一句话概括）",
+      "content": "详细内容，可以包含多个要点。",
+      "source_ids": [1, 3, 5]
+    }
+  ]
+}
+
+# 字段说明
+- summary: 整体总结，用2-3句话概括本期速报最重要的几个动态，让读者快速了解本期亮点
+- category: 必须是 model、product、tutorial、hardware、industry 之一
+- title: 事件标题，一句话概括
+- content: 详细内容，完整描述，不要省略
+- source_ids: 引用的原始推文编号列表
+
+# 重要规则
+- 直接输出 JSON，不要有 ```json 标记或其他任何文字
+- 将相关的多条推文合并为一条快讯
+- 全中文输出，可保留必要的英文关键词
+- summary 要精炼有力，突出最重要的1-2个事件
 """).strip()
 
 DEFAULT_DAILY_PROMPT = textwrap.dedent("""
@@ -140,6 +312,14 @@ MODE_SETTINGS = {
         default_limit=config.QUICK_DIGEST_LIMIT,
         default_max_age=config.QUICK_DIGEST_MAX_AGE_HOURS,
     ),
+    "quick_json": ModeSettings(
+        key="quick_json",
+        system_prompt=QUICK_JSON_PROMPT,
+        heading="AI 快讯速览",
+        output_prefix="ai_quick",
+        default_limit=config.QUICK_DIGEST_LIMIT,
+        default_max_age=config.QUICK_DIGEST_MAX_AGE_HOURS,
+    ),
     "daily": ModeSettings(
         key="daily",
         system_prompt=DEFAULT_DAILY_PROMPT,
@@ -149,6 +329,114 @@ MODE_SETTINGS = {
         default_max_age=None,
     ),
 }
+
+
+# ============ JSON 解析和品牌匹配辅助函数 ============
+
+def extract_json_from_text(text: str) -> Optional[Dict[str, Any]]:
+    """从 AI 输出中提取 JSON，处理各种格式问题"""
+    text = text.strip()
+
+    # 尝试移除 markdown 代码块标记
+    if text.startswith("```"):
+        lines = text.split("\n")
+        # 移除第一行（```json 或 ```）
+        lines = lines[1:]
+        # 移除最后的 ```
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        text = "\n".join(lines)
+
+    # 尝试直接解析
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    # 尝试找到 JSON 对象的边界
+    start = text.find("{")
+    end = text.rfind("}") + 1
+    if start != -1 and end > start:
+        try:
+            return json.loads(text[start:end])
+        except json.JSONDecodeError:
+            pass
+
+    # 尝试修复常见问题
+    # 1. 单引号替换为双引号
+    fixed = text.replace("'", '"')
+    try:
+        return json.loads(fixed)
+    except json.JSONDecodeError:
+        pass
+
+    # 2. 处理尾部逗号
+    fixed = re.sub(r',\s*}', '}', text)
+    fixed = re.sub(r',\s*]', ']', fixed)
+    try:
+        return json.loads(fixed)
+    except json.JSONDecodeError:
+        pass
+
+    return None
+
+
+def match_brands(text: str, title: str = "") -> List[str]:
+    """从文本中匹配品牌（大小写不敏感）
+
+    Args:
+        text: 完整文本（标题+内容）
+        title: 标题文本，用于优先排序
+
+    Returns:
+        品牌列表，标题中出现的品牌排在前面
+    """
+    text_lower = text.lower()
+    title_lower = title.lower() if title else ""
+
+    title_brands = []  # 标题中匹配到的品牌
+    content_brands = []  # 仅在内容中匹配到的品牌
+
+    for brand, keywords in BRAND_KEYWORDS.items():
+        for keyword in keywords:
+            keyword_lower = keyword.lower()
+            if keyword_lower in text_lower:
+                # 检查是否在标题中出现
+                if title_lower and keyword_lower in title_lower:
+                    if brand not in title_brands:
+                        title_brands.append(brand)
+                else:
+                    if brand not in content_brands and brand not in title_brands:
+                        content_brands.append(brand)
+                break
+
+    # 标题中的品牌优先
+    return title_brands + content_brands
+
+
+def detect_category(text: str) -> str:
+    """根据文本内容检测分类"""
+    text_lower = text.lower()
+    scores = {}
+
+    for cat_key, cat_info in CATEGORIES.items():
+        score = 0
+        for keyword in cat_info["keywords"]:
+            if keyword.lower() in text_lower:
+                score += 1
+        scores[cat_key] = score
+
+    # 返回得分最高的分类，如果都是0则返回 industry
+    if max(scores.values()) == 0:
+        return "industry"
+    return max(scores, key=scores.get)
+
+
+def get_category_name(cat_key: str) -> str:
+    """获取分类的中文名称"""
+    if cat_key in CATEGORIES:
+        return CATEGORIES[cat_key]["name"]
+    return "行业资讯"
 
 
 class Event:
@@ -514,19 +802,206 @@ class DigestAnalyzer:
         print(f"[{self.mode}] 摘要已写入 {output.report_path}")
         return output
 
+    def run_json(self, date: Optional[str] = None, limit: Optional[int] = None,
+                 max_age: Optional[int] = None) -> Dict[str, Any]:
+        """执行分析任务并输出 JSON 格式（用于网页渲染）"""
+        target_date = None  # 快讯模式不需要日期
+
+        raw_events, aggregated_path = self.aggregator.gather(date=target_date)
+        events = [Event(item) for item in raw_events]
+
+        if max_age is None:
+            max_age = self.settings.default_max_age
+
+        events = self.filter_events(events, max_age_hours=max_age)
+
+        if not events:
+            raise ValueError("没有符合筛选条件的事件，停止生成摘要。")
+
+        limit = limit or self.settings.default_limit
+        selected = self.select_top_events(events, limit=min(limit, len(events)))
+
+        # 构建 prompt 并调用 AI
+        prompt = self.build_prompt(selected)
+        ai_response = self.call_ai(prompt)
+
+        # 调试输出：便于了解运行状态和排查问题
+        print(f"[quick_json] 发送给 AI 的事件数量: {len(selected)}")
+        print(f"[quick_json] AI 响应长度: {len(ai_response)} 字符")
+
+        # 解析 AI 的 JSON 响应
+        parsed = extract_json_from_text(ai_response)
+
+        if parsed is None:
+            print(f"[警告] AI 未返回有效 JSON，尝试使用备用解析")
+            print(f"[警告] AI 原始响应: {ai_response[:500]}")
+            # 备用方案：将 AI 响应作为纯文本处理
+            parsed = self._fallback_parse(ai_response, selected)
+
+        # 处理并补充品牌信息
+        result = self._process_json_result(parsed, selected)
+
+        # 保存 JSON 文件
+        json_path = self._save_web_json(result)
+        print(f"[quick_json] 汇总数据来源：{aggregated_path}")
+        print(f"[quick_json] JSON 已写入 {json_path}")
+
+        return result
+
+    def _fallback_parse(self, ai_response: str, selected: Sequence[Event]) -> Dict[str, Any]:
+        """备用解析：当 AI 未返回有效 JSON 时，从文本中提取信息"""
+        items = []
+        lines = ai_response.strip().split("\n")
+
+        current_item = None
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+
+            # 检测新条目开始（一、二、三...）
+            match = re.match(r'^[一二三四五六七八九十]+[、.]\s*(.+)$', line)
+            if match:
+                if current_item:
+                    items.append(current_item)
+                title = match.group(1).strip()
+                current_item = {
+                    "category": detect_category(title),
+                    "title": title[:50],  # 限制标题长度
+                    "content": "",
+                    "source_ids": []
+                }
+            elif current_item and line.startswith("·"):
+                # 详情行
+                current_item["content"] += line[1:].strip() + " "
+            elif current_item and not line.startswith("AI总结"):
+                # 其他内容行
+                if not current_item["content"]:
+                    current_item["content"] = line
+
+        if current_item:
+            items.append(current_item)
+
+        return {
+            "total": len(items),
+            "items": items
+        }
+
+    def _process_json_result(self, parsed: Dict[str, Any],
+                              selected: Sequence[Event]) -> Dict[str, Any]:
+        """处理 AI 返回的 JSON，补充品牌信息和来源详情"""
+        now = dt.datetime.now()
+
+        # 构建事件索引映射
+        event_map = {idx + 1: event for idx, event in enumerate(selected)}
+
+        processed_items = []
+        for item in parsed.get("items", []):
+            title = item.get('title', '')
+            content = item.get('content', '')
+            # 合并标题和内容用于品牌匹配
+            full_text = f"{title} {content}"
+
+            # 匹配品牌（标题中的品牌优先）
+            brands = match_brands(full_text, title=title)
+
+            # 确保分类有效
+            category = item.get("category", "industry")
+            if category not in CATEGORIES:
+                category = detect_category(full_text)
+
+            # 获取来源详情
+            source_ids = item.get("source_ids", [])
+            sources = []
+            for sid in source_ids:
+                if sid in event_map:
+                    event = event_map[sid]
+                    sources.append({
+                        "author": event.author or event.source_name,
+                        "url": event.url,
+                        "source_type": event.source
+                    })
+
+            # 如果没有指定来源，尝试从所有事件中匹配
+            if not sources:
+                for event in selected:
+                    event_text = f"{event.title} {event.content}"
+                    # 简单匹配：检查标题关键词是否在事件中出现
+                    title_words = item.get("title", "").split()[:3]
+                    if any(word in event_text for word in title_words if len(word) > 2):
+                        sources.append({
+                            "author": event.author or event.source_name,
+                            "url": event.url,
+                            "source_type": event.source
+                        })
+                        if len(sources) >= 3:  # 最多关联3个来源
+                            break
+
+            processed_items.append({
+                "category": category,
+                "category_name": get_category_name(category),
+                "title": item.get("title", ""),
+                "content": item.get("content", ""),
+                "brands": brands,
+                "sources": sources
+            })
+
+        # 构建完整的附录（所有来源）
+        all_sources = []
+        for idx, event in enumerate(selected, start=1):
+            snippet = (event.summary or event.content).replace("\n", " ").strip()
+            if len(snippet) > 60:
+                snippet = snippet[:60].rstrip() + "..."
+            all_sources.append({
+                "index": idx,
+                "author": event.author or event.source_name,
+                "snippet": snippet,
+                "url": event.url,
+                "source_type": event.source
+            })
+
+        return {
+            "generated_at": now.strftime("%Y-%m-%d %H:%M:%S"),
+            "date_display": now.strftime("%Y年%m月%d日"),
+            "summary": parsed.get("summary", ""),  # AI 生成的整体总结
+            "total": len(processed_items),
+            "items": processed_items,
+            "all_sources": all_sources
+        }
+
+    def _save_web_json(self, result: Dict[str, Any]) -> Path:
+        """保存 JSON 到 web-json 目录"""
+        now = dt.datetime.now()
+        timestamp = now.strftime("%Y-%m-%d_%H%M")
+
+        # 保存带时间戳的版本
+        json_path = config.WEB_JSON_DIR / f"quick_{timestamp}.json"
+        json_path.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+
+        # 同时保存 latest 版本（方便 PHP 读取）
+        latest_path = config.WEB_JSON_DIR / "quick_latest.json"
+        latest_path.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+
+        return json_path
+
 
 def main():
     """命令行入口"""
     import argparse
     parser = argparse.ArgumentParser(description="AI 推文摘要分析")
-    parser.add_argument("--mode", choices=["quick", "daily"], default="quick")
+    parser.add_argument("--mode", choices=["quick", "quick_json", "daily"], default="quick")
     parser.add_argument("--date", help="日报日期 (YYYY-MM-DD)")
     parser.add_argument("--limit", type=int, help="推文数量限制")
     parser.add_argument("--max-age", type=int, help="最大时间范围（小时）")
     args = parser.parse_args()
 
     analyzer = DigestAnalyzer(mode=args.mode)
-    analyzer.run(date=args.date, limit=args.limit, max_age=args.max_age)
+
+    if args.mode == "quick_json":
+        result = analyzer.run_json(date=args.date, limit=args.limit, max_age=args.max_age)
+        print(f"生成了 {result['total']} 条快讯")
+    else:
+        analyzer.run(date=args.date, limit=args.limit, max_age=args.max_age)
 
 
 if __name__ == "__main__":

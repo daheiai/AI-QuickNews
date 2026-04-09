@@ -1,0 +1,305 @@
+/**
+ * AI 快讯网页样式
+ * 浅色主题，卡片式布局
+ * 针对手机截图优化
+ */
+
+/* ============ 基础重置 ============ */
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+/* ============ CSS 变量 ============ */
+:root {
+    /* 浅色背景 */
+    --bg-primary: #f5f5f7;
+    --bg-secondary: #ffffff;
+    --bg-card: #ffffff;
+
+    /* 文字色 - 深色文字 */
+    --text-primary: #1d1d1f;
+    --text-secondary: #424245;
+    --text-muted: #86868b;
+
+    /* 边框 */
+    --border-color: rgba(0, 0, 0, 0.08);
+    --border-radius: 16px;
+    --border-radius-sm: 10px;
+
+    /* 分类色 */
+    --cat-model: #a855f7;
+    --cat-product: #3b82f6;
+    --cat-tutorial: #22c55e;
+    --cat-hardware: #f59e0b;
+    --cat-industry: #6b7280;
+
+    /* 间距 */
+    --spacing-xs: 4px;
+    --spacing-sm: 8px;
+    --spacing-md: 12px;
+    --spacing-lg: 16px;
+    --spacing-xl: 20px;
+}
+
+/* ============ 全局样式 ============ */
+html {
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+    font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, sans-serif;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    line-height: 1.6;
+    min-height: 100vh;
+}
+
+/* ============ 容器 ============ */
+.container {
+    max-width: 390px;
+    margin: 0 auto;
+    padding: var(--spacing-lg);
+    background-color: var(--bg-primary);
+}
+
+/* ============ 页头 ============ */
+.header {
+    margin-bottom: var(--spacing-lg);
+    padding-bottom: var(--spacing-lg);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.header-content {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
+.header-avatar {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    border: 2px solid rgba(0, 0, 0, 0.06);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.header-text {
+    flex: 1;
+}
+
+.header-title {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+    letter-spacing: -0.02em;
+}
+
+.header-date {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
+.date-icon {
+    width: 14px;
+    height: 14px;
+    opacity: 0.7;
+}
+
+/* ============ AI 总结区域 ============ */
+.summary-section {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-lg);
+    margin-bottom: var(--spacing-xl);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.25);
+}
+
+.summary-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.8);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: var(--spacing-sm);
+}
+
+.summary-text {
+    font-size: 1rem;
+    font-weight: 500;
+    color: #ffffff;
+    line-height: 1.7;
+}
+
+/* ============ 主内容区 ============ */
+.main-content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xl);
+}
+
+/* ============ 分类区块 ============ */
+.category-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.category-header {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding-left: 2px;
+}
+
+.category-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.category-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.01em;
+}
+
+.category-count {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    background: rgba(0, 0, 0, 0.05);
+    padding: 2px 10px;
+    border-radius: 10px;
+    font-weight: 500;
+}
+
+/* ============ 新闻列表 ============ */
+.news-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+/* ============ 新闻卡片 ============ */
+.news-card {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-lg);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+/* 卡片元信息（Logo + 标签）*/
+.card-meta {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    flex-wrap: wrap;
+}
+
+.brand-logos {
+    display: flex;
+    gap: -6px;
+}
+
+.brand-logo {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--bg-card);
+    margin-left: -6px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.brand-logo:first-child {
+    margin-left: 0;
+}
+
+.brand-tags {
+    display: flex;
+    gap: var(--spacing-xs);
+    flex-wrap: wrap;
+}
+
+.brand-tag {
+    font-size: 0.7rem;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+/* 新闻标题 - 加大加粗 */
+.news-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.45;
+    letter-spacing: -0.01em;
+    margin-top: var(--spacing-xs);
+}
+
+/* 新闻内容 */
+.news-content {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    line-height: 1.7;
+}
+
+/* ============ 页脚 ============ */
+.footer {
+    margin-top: var(--spacing-xl);
+    padding-top: var(--spacing-lg);
+    border-top: 1px solid var(--border-color);
+}
+
+.footer-content {
+    text-align: center;
+}
+
+.footer-desc {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+/* ============ 无内容提示 ============ */
+.empty-message {
+    text-align: center;
+    padding: var(--spacing-xl);
+    color: var(--text-muted);
+}
+
+/* ============ 响应式（主要为截图服务）============ */
+@media (max-width: 390px) {
+    .container {
+        padding: var(--spacing-md);
+    }
+
+    .news-card {
+        padding: var(--spacing-md);
+    }
+}
+
+/* ============ 打印 / 截图优化 ============ */
+@media print {
+    body {
+        background-color: var(--bg-primary) !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+}

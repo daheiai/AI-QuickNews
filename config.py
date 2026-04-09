@@ -18,9 +18,14 @@ RSS_DIR = SOURCES_DIR / "rss"
 TWEETS_DIR = TWITTER_DIR  # 向后兼容旧路径
 REPORTS_DIR = DATA_DIR / "reports"
 LOGS_DIR = DATA_DIR / "logs"
+WEB_JSON_DIR = DATA_DIR / "web-json"  # Web 渲染用的 JSON 数据
+SCREENSHOTS_DIR = DATA_DIR / "screenshots"  # 截图输出目录
+
+# Web 目录
+WEB_DIR = BASE_DIR / "web"
 
 # 确保目录存在
-for path in (SOURCES_DIR, EVENTS_DIR, TWITTER_DIR, RSS_DIR, REPORTS_DIR, LOGS_DIR):
+for path in (SOURCES_DIR, EVENTS_DIR, TWITTER_DIR, RSS_DIR, REPORTS_DIR, LOGS_DIR, WEB_JSON_DIR, SCREENSHOTS_DIR):
     path.mkdir(parents=True, exist_ok=True)
 
 # Twitter 配置
@@ -54,4 +59,4 @@ QUICK_DIGEST_LIMIT = int(os.getenv("QUICK_DIGEST_LIMIT", "30"))
 DAILY_DIGEST_LIMIT = int(os.getenv("DAILY_DIGEST_LIMIT", "60"))
 QUICK_DIGEST_MAX_AGE_HOURS = int(os.getenv("QUICK_DIGEST_MAX_AGE_HOURS", "48"))
 DIGEST_TEMPERATURE = float(os.getenv("DIGEST_TEMPERATURE", "0.2"))
-DIGEST_MAX_TOKENS = int(os.getenv("DIGEST_MAX_TOKENS", "1200"))
+DIGEST_MAX_TOKENS = int(os.getenv("DIGEST_MAX_TOKENS", "4000"))

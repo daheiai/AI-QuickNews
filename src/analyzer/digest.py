@@ -145,7 +145,7 @@ BRAND_KEYWORDS = {
     "modal": ["modal.com", "modal ai"],
 
     # 其他工具/产品
-    "bilibili": ["bilibili ai", "b站ai", "哔哩哔哩ai"],
+    "bilibili": ["bilibili", "b站ai", "哔哩哔哩"],
     "monica": ["monica ai"],
     "youmind": ["youmind"],
     "jina": ["jina ai"],
@@ -202,89 +202,26 @@ class DigestOutput:
     appendix_text: str
 
 
-DEFAULT_QUICK_PROMPT = textwrap.dedent("""
-# 角色设定
-你是一名 AI 行业速报编辑，AI行业每天都有爆炸式的信息，而你擅长从中抓取到真正的价值。
-你的核心目标是输出「是否有重要动态」+「核心内容摘要」+「价值判断」。
-
----
-
-# 判断逻辑（按优先级）
-1、新开源模型（关键词：release, Open source, 开源, 发布, SOTA ,Qwen,GLM 等开源模型发布或更新）
-2、商业大模型更新（关键词：ChatGPT, Claude, Gemini, Grok, Kimi, MiniMax等闭源模型动态）
-3、模型实测结论（关键词：对比, 跑测试, 实测, 差距, ）
-3、AI产品/工具发布与更新（关键词：API，推出，试玩, YouMind, Sora, Codex ，等AI工具动态）
-4、github开源项目（关键词：star, 工具, 开源, 分享, 爆火 ,含有github.com链接）
-5、提示词创新（出现prompt，实用性工具性的提示词模板）
-6、机器人/硬件相关（关键词：Boston Dynamics, Figure, Optimus ,树莓派 等）
-7、重大软件的更新（关键词：Chrome、Vscode等）
-
-
-只有推文中**直接提及或隐含这些事件行为**（发布、上线、开放、更新、宣布、推出）时，才视为"有动态"。
-额外信息：JustinLin610是Qwen团队的成员，他会说一些谜语，比如要有新东西来了。Hx1u0是Kimi团队的成员，会爆料一些有趣的开发故事。
-
-
----
-
-# 输出要求
-## 第一部分
-用一句话说明整体结论：
-- 如果没有检测到符合条件的内容，输出："暂无重大动态。"
-- 如果检测到，输出："有 X 条重要动态。"
-
-## 第二部分
-逐条总结：
-- 每条最多 5 行。
-- 信息量小的，用一句话概括，越精简越好不必换行。
-- 信息量大的，再用以下格式：
-
-一、事件标题（用一句话抓住主干）
-· 细节1：
-· 细节2：
-
-## 第三部分
-AI总结：针对以上内容做总结。
----
-
-# 语言要求
-- 全中文输出，但可保留必要的英文关键词。
-- 严禁出现"以下是结果""我认为"等AI自述语。
-- 不得输出任何格式说明、推理过程或无关评论。
-- 再次精简，
-
----
-
-# 示例输出
-有3条重要动态：
-一、Sora APP 安卓版正式上线，已在加、美、日等地区开放下载。
-
-二、Google 推出 File Search Tool
-    ·产品形态：完全托管的 RAG 系统，内置于 Gemini API
-    ·核心价值：将 RAG 简化为一行 API 调用，自动完成索引、向量嵌入与语义检索
-    ·计费模式：仅首次建立索引收费（$0.15/100万tokens），后续查询免费 ·支持格式：PDF、Word、TXT、JSON、源代码等主流格式
-
-三、苹果新版 Siri 将由 Gemini 提供后台支持，预计 2026 年 3 月上线。
-
-AI总结：谷歌推出的工具会大幅降低企业级知识库部署门槛，RAG技术平民化。Sora朝着更广泛的用户群体进军，Siri抛弃OpenAI转向Gemini。
-""").strip()
-
-# 新版快讯 Prompt - 输出 JSON 格式
+# 快讯 Prompt - 输出 JSON 格式
 QUICK_JSON_PROMPT = textwrap.dedent("""
 # 角色设定
 你是一名 AI 行业速报编辑，擅长从海量信息中抓取有价值的内容并归类整理。
+你的读者既包括关注前沿模型的开发者，也包括想用 AI 工具提升效率的普通用户。
 
 # 内容分类
 1、model（模型动态）：模型发布、更新、评测、训练方法、性能对比
-2、product（产品工具）：AI产品、工具、GitHub项目、软件更新、新功能、API
-3、tutorial（技巧教程）：提示词、使用技巧、教程分享
+2、product（产品工具）：AI 产品发布、工具推荐、GitHub 项目、软件更新、新功能、API
+3、tutorial（技巧教程）：AI 工具使用技巧、工作流分享、效率提升方法、Prompt 技巧、新工具体验心得、具体场景的解决方案。内容特征包括：描述了具体使用场景（"我用 xxx 实现了 xxx"）、包含实操步骤、有个人体验反馈（"效果很好"、"解决了 xxx 问题"）
 4、hardware（硬件动态）：机器人、芯片、硬件设备、GPU
 5、industry（行业资讯）：研究论文、安全报告、融资、政策、公司动态、合作
 
 # 判断标准
 - 有实质信息内容的推文都应该被收录
+- 工具推荐、使用技巧、工作流分享等实用内容同样重要，不要只关注模型发布
 - 多条相关推文可以合并为一条快讯（如同一主题的连续推文）
 - 过滤掉纯闲聊、表情回复、无实质内容的推文
 - 研究论文、安全报告属于 industry 分类
+- 判断时不要依赖你是否认识具体产品名。如果一条推文清晰描述了"这个工具能做什么"+"怎么用"或"效果如何"，即使你不认识这个产品，也应该收录
 
 额外信息：JustinLin610是Qwen团队成员，Hx1u0是Kimi团队成员。
 
@@ -292,23 +229,23 @@ QUICK_JSON_PROMPT = textwrap.dedent("""
 请严格按照以下 JSON 格式输出，不要输出任何其他内容：
 
 {
-  "summary": "2-3句话的整体总结，用【】标记重点词汇",
+  "summary": "1-2句话的整体总结，用【】标记重点词汇",
   "total": 3,
   "items": [
     {
       "category": "model",
       "title": "事件标题（一句话概括）",
-      "content": "详细内容，用【】标记核心亮点词汇。",
+      "content": "2-3句话说清要点，用【】标记核心词汇。",
       "source_ids": [1, 3, 5]
     }
   ]
 }
 
 # 字段说明
-- summary: 整体总结，用2-3句话概括本期速报最重要的几个动态
+- summary: 整体总结，1-2句话点出本期最重要的动态
 - category: 必须是 model、product、tutorial、hardware、industry 之一
 - title: 事件标题，一句话概括
-- content: 详细内容，完整描述，不要省略
+- content: 核心内容，2-3句话说清要点即可，控制在80字以内，不要堆砌细节
 - source_ids: 引用的原始推文编号列表
 
 # 重点标记规则
@@ -330,6 +267,7 @@ QUICK_JSON_PROMPT = textwrap.dedent("""
 - 将相关的多条推文合并为一条快讯
 - 全中文输出，可保留必要的英文关键词
 - summary 要精炼有力，突出最重要的1-2个事件
+- 每条快讯的 content 必须控制在 80 字以内，只保留最核心的信息，让读者 60 秒内读完全部内容
 """).strip()
 
 DEFAULT_DAILY_PROMPT = textwrap.dedent("""
@@ -367,14 +305,6 @@ DEFAULT_DAILY_PROMPT = textwrap.dedent("""
 """).strip()
 
 MODE_SETTINGS = {
-    "quick": ModeSettings(
-        key="quick",
-        system_prompt=DEFAULT_QUICK_PROMPT,
-        heading="AI 快讯速览",
-        output_prefix="ai_quick",
-        default_limit=config.QUICK_DIGEST_LIMIT,
-        default_max_age=config.QUICK_DIGEST_MAX_AGE_HOURS,
-    ),
     "quick_json": ModeSettings(
         key="quick_json",
         system_prompt=QUICK_JSON_PROMPT,
@@ -598,6 +528,55 @@ class DigestAnalyzer:
             )
         return "\n".join(parts)
 
+    def _load_recent_titles(self, hours: int = 48) -> List[str]:
+        """从最近的 web-json 文件中提取已报道的标题（用于去重）"""
+        cutoff = dt.datetime.now() - dt.timedelta(hours=hours)
+        titles = []
+
+        json_dir = config.WEB_JSON_DIR
+        if not json_dir.exists():
+            return titles
+
+        for f in sorted(json_dir.glob("quick_????-??-??_????.json"), reverse=True):
+            try:
+                ts_str = f.stem.replace("quick_", "")
+                file_time = dt.datetime.strptime(ts_str, "%Y-%m-%d_%H%M")
+            except ValueError:
+                continue
+
+            if file_time < cutoff:
+                break
+
+            try:
+                data = json.loads(f.read_text(encoding="utf-8"))
+                for item in data.get("items", []):
+                    title = item.get("title", "").strip()
+                    if title:
+                        titles.append(title)
+            except (json.JSONDecodeError, OSError):
+                continue
+
+        return titles
+
+    def _build_dedup_section(self, hours: int = 48) -> str:
+        """构建去重提示段落，附加到 prompt 末尾"""
+        recent_titles = self._load_recent_titles(hours=hours)
+        if not recent_titles:
+            return ""
+
+        lines = [
+            "\n\n---",
+            "以下是近48小时内已报道的标题。请避免重复报道相同内容。",
+            "但如果某事件有了重要后续进展（如新测评结果、官方回应、版本更新、新数据公布等），应作为新条目报道。",
+            "",
+            "已报道标题：",
+        ]
+        for t in recent_titles:
+            lines.append(f"- {t}")
+
+        print(f"[去重] 加载了 {len(recent_titles)} 条近48小时已报道标题")
+        return "\n".join(lines)
+
     def call_ai(self, prompt: str) -> str:
         """调用 AI 模型"""
         base = config.OPENAI_BASE_URL.rstrip("/")
@@ -675,7 +654,7 @@ class DigestAnalyzer:
         return DigestOutput(report_path=path, primary_text=primary_text, appendix_text=appendix_text)
 
     def _format_primary_text(self, summary: str, generated_at: dt.datetime) -> str:
-        header_label = "大黑4小时AI速报" if self.mode == "quick" else "大黑AI日报"
+        header_label = "大黑AI日报"
         header = f"【{header_label}  时间：{generated_at.strftime('%Y-%m-%d %H:%M:%S')}】"
 
         conclusion_section = self._extract_section(summary, "1. 速报结论")
@@ -698,7 +677,7 @@ class DigestAnalyzer:
                 content_text = "\n".join(content_lines[idx + 1:]).lstrip()
             break
 
-        ending = "本时段速报完毕，请等待下一个4小时速报~" if self.mode == "quick" else "本期日报结束，感谢关注~"
+        ending = "本期日报结束，感谢关注~"
 
         parts = [header, conclusion_text, "", content_text.strip(), "", ending]
         return "\n".join(part for part in parts if part is not None)
@@ -823,11 +802,8 @@ class DigestAnalyzer:
 
     def run(self, date: Optional[str] = None, limit: Optional[int] = None,
             max_age: Optional[int] = None):
-        """执行分析任务"""
-        if self.mode == "quick":
-            target_date = None
-        else:
-            target_date = self._resolve_daily_date(date)
+        """执行分析任务（用于 daily 模式）"""
+        target_date = self._resolve_daily_date(date)
 
         raw_events, aggregated_path = self.aggregator.gather(date=target_date)
 
@@ -850,6 +826,7 @@ class DigestAnalyzer:
         selected = self.select_top_events(events, limit=min(limit, len(events)))
 
         prompt = self.build_prompt(selected)
+        prompt += self._build_dedup_section(hours=48)
         summary = self.call_ai(prompt)
 
         output = self.save_report(summary, selected, heading)
@@ -885,8 +862,9 @@ class DigestAnalyzer:
         limit = limit or self.settings.default_limit
         selected = self.select_top_events(events, limit=min(limit, len(events)))
 
-        # 构建 prompt 并调用 AI
+        # 构建 prompt 并调用 AI（附加去重信息）
         prompt = self.build_prompt(selected)
+        prompt += self._build_dedup_section(hours=48)
         ai_response = self.call_ai(prompt)
 
         # 调试输出：便于了解运行状态和排查问题
@@ -1064,7 +1042,7 @@ def main():
     """命令行入口"""
     import argparse
     parser = argparse.ArgumentParser(description="AI 推文摘要分析")
-    parser.add_argument("--mode", choices=["quick", "quick_json", "daily"], default="quick")
+    parser.add_argument("--mode", choices=["quick_json", "daily"], default="quick_json")
     parser.add_argument("--date", help="日报日期 (YYYY-MM-DD)")
     parser.add_argument("--limit", type=int, help="推文数量限制")
     parser.add_argument("--max-age", type=int, help="最大时间范围（小时）")
@@ -1076,6 +1054,7 @@ def main():
         result = analyzer.run_json(date=args.date, limit=args.limit, max_age=args.max_age)
         print(f"生成了 {result['total']} 条快讯")
     else:
+        # daily 模式
         analyzer.run(date=args.date, limit=args.limit, max_age=args.max_age)
 
 

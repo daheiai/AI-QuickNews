@@ -32,7 +32,7 @@ def _collect_sources():
 
 
 def run_quick_mode():
-    """快讯模式：抓取 -> 分析 -> 推送"""
+    """快讯模式：抓取 -> 分析 -> 推送（纯文字版，从 JSON 派生）"""
     print("=" * 50)
     print("快讯模式启动")
     print("=" * 50)
@@ -41,19 +41,18 @@ def run_quick_mode():
     print("\n[1/3] 抓取多信源数据...")
     _collect_sources()
 
-    # 2. 生成快讯
-    print("\n[2/3] 生成 AI 快讯...")
-    analyzer = DigestAnalyzer(mode="quick")
-    digest_output = analyzer.run()
+    # 2. 生成 JSON 格式的快讯
+    print("\n[2/3] 生成 AI 快讯 (JSON)...")
+    analyzer = DigestAnalyzer(mode="quick_json")
+    result = analyzer.run_json()
+    print(f"生成了 {result['total']} 条快讯")
 
-    # 3. 推送到飞书
+    # 3. 推送到飞书（从 JSON 格式化为文字）
     print("\n[3/3] 推送到飞书...")
     notifier = FeishuNotifier()
-    notifier.send_digest_messages(
-        digest_output.primary_text,
-        digest_output.appendix_text,
-        mode="quick",
-    )
+    primary_text = _format_primary_from_json(result)
+    appendix_text = _format_appendix_from_json(result)
+    notifier.send_digest_messages(primary_text, appendix_text, mode="quick")
 
     print("\n快讯模式完成")
 
@@ -105,6 +104,43 @@ def run_quick_image_mode(page_url: str = None, skip_collect: bool = False):
     notifier.send_message(appendix_text)
 
     print("\n快讯图片模式完成")
+
+
+def _format_primary_from_json(result: dict) -> str:
+    """从 JSON 结果格式化主文本（用于飞书推送）"""
+    now_str = result.get("generated_at", dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    header = f"【大黑4小时AI速报  时间：{now_str}】"
+
+    # 总结
+    summary = result.get("summary", "")
+
+    # 条目列表
+    items = result.get("items", [])
+    numerals = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十"]
+
+    lines = [header, ""]
+    if summary:
+        lines.append(summary.replace("【", "").replace("】", ""))
+        lines.append("")
+
+    lines.append(f"有 {len(items)} 条重要动态：")
+    lines.append("")
+
+    for idx, item in enumerate(items):
+        numeral = numerals[idx] if idx < len(numerals) else str(idx + 1)
+        title = item.get("title", "")
+        content = item.get("content", "").replace("【", "").replace("】", "")
+
+        lines.append(f"{numeral}、{title}")
+        if content and content != title:
+            # 简化内容，避免过长
+            if len(content) > 200:
+                content = content[:200] + "..."
+            lines.append(f"   {content}")
+        lines.append("")
+
+    lines.append("本时段速报完毕，请等待下一个4小时速报~")
+    return "\n".join(lines)
 
 
 def _format_appendix_from_json(result: dict) -> str:
@@ -167,18 +203,17 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 使用示例：
-  python main.py --mode quick        # 快讯模式（抓取+分析+推送文字）
-  python main.py --mode quick_image  # 快讯图片模式（抓取+分析+截图+推送图片）
+  python main.py --mode quick        # 快讯模式（抓取+分析+推送文字到飞书）
+  python main.py --mode quick_image  # 快讯图片模式（抓取+分析+截图+推送图片到飞书）
   python main.py --mode quick_image --page-url http://localhost/ai-digest/
   python main.py --mode quick_image --skip-collect  # 跳过数据抓取
   python main.py --mode daily        # 日报模式（生成日报+推送）
 
   # 单独运行各模块
-  python -m src.collectors.twitter           # 仅抓取推文
-  python -m src.analyzer.digest --mode quick # 仅生成快讯
+  python -m src.collectors.twitter             # 仅抓取推文
   python -m src.analyzer.digest --mode quick_json  # 生成快讯 JSON
-  python -m src.notifier.feishu --mode quick # 仅推送快讯
-  python -m src.renderer.screenshot <url>    # 单独截图
+  python -m src.notifier.feishu --mode quick   # 仅推送快讯
+  python -m src.renderer.screenshot <url>      # 单独截图
         """
     )
     parser.add_argument(

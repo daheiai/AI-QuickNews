@@ -205,13 +205,30 @@ function render_highlights($text) {
 
         <!-- 页脚 -->
         <footer class="footer">
-            <div>由人工大黑制作</div>
+            <div>由<a href="https://daheiai.com/" target="_blank" class="footer-link-subtle">人工大黑</a>制作</div>
             <div class="footer-source">
                 经由 <?php echo $twitter_count; ?> 条推特信源、<?php echo $rss_count; ?> 条RSS信源生成
             </div>
-            <div class="footer-history">
-                <a href="history.php">历史期刊</a>
+            <div class="footer-source">
+                访问 news.daheiai.com 在线查看本期日报
             </div>
+            <div class="footer-links">
+                <a href="history.php">历史期刊</a>
+                <a onclick="document.getElementById('sources-panel').classList.toggle('active')">查看本期来源</a>
+            </div>
+            <?php if (!empty($data['all_sources'])): ?>
+            <div id="sources-panel" class="sources-panel">
+                <div class="sources-panel-title">本期来源（共 <?php echo count($data['all_sources']); ?> 条）</div>
+                <?php foreach ($data['all_sources'] as $src): ?>
+                <div class="source-item">
+                    <span class="source-type"><?php echo $src['source_type'] === 'twitter' ? '推特' : 'RSS'; ?></span>
+                    <span class="source-author"><?php echo htmlspecialchars($src['author']); ?></span>
+                    <span class="source-snippet"><?php echo htmlspecialchars($src['snippet']); ?></span>
+                    <a href="<?php echo htmlspecialchars($src['url']); ?>" target="_blank">查看原文</a>
+                </div>
+                <?php endforeach; ?>
+            </div>
+            <?php endif; ?>
         </footer>
     </div>
 

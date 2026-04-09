@@ -16,22 +16,24 @@ $history = get_history_list();
     <link rel="stylesheet" href="css/style.css">
     <style>
         .history-wrapper {
-            max-width: 500px;
+            width: 390px;
             margin: 0 auto;
             padding: 20px;
             min-height: 100vh;
-            background: #0f0f0f;
+            background: var(--bg-color);
+            box-shadow: 0 0 20px rgba(0,0,0,0.05);
         }
         .history-header {
             text-align: center;
             padding: 30px 0;
-            border-bottom: 1px solid #222;
+            border-bottom: 1px solid var(--border-color);
             margin-bottom: 20px;
         }
         .history-header h1 {
+            font-family: "Noto Serif SC", "Songti SC", serif;
             font-size: 1.2rem;
-            color: #999;
-            font-weight: normal;
+            color: var(--text-color);
+            font-weight: 900;
             margin: 0;
         }
         .history-list {
@@ -40,42 +42,42 @@ $history = get_history_list();
             margin: 0;
         }
         .history-item {
-            border-bottom: 1px solid #1a1a1a;
+            border-bottom: 1px solid var(--border-color);
         }
         .history-item a {
             display: flex;
             justify-content: space-between;
             align-items: center;
             padding: 16px 12px;
-            color: #ccc;
+            color: var(--text-color);
             text-decoration: none;
             transition: background 0.2s;
         }
         .history-item a:hover {
-            background: #1a1a1a;
+            background: var(--banner-bg);
         }
         .history-date {
             font-size: 0.95rem;
         }
         .history-issue {
             font-size: 0.85rem;
-            color: #666;
+            color: var(--sub-text);
         }
         .history-back {
             text-align: center;
             padding: 30px 0;
         }
         .history-back a {
-            color: #666;
+            color: var(--sub-text);
             text-decoration: none;
             font-size: 0.85rem;
         }
         .history-back a:hover {
-            color: #999;
+            color: var(--accent-color);
         }
         .history-empty {
             text-align: center;
-            color: #666;
+            color: var(--sub-text);
             padding: 60px 20px;
         }
     </style>

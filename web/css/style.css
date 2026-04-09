@@ -238,6 +238,8 @@ strong {
     color: #333;
     line-height: 1.6;
     text-align: justify;
+    overflow-wrap: break-word;
+    word-break: break-word;
 }
 
 /* --- 页脚 --- */
@@ -257,18 +259,94 @@ strong {
     margin-top: 4px;
 }
 
-.footer-history {
-    margin-top: 12px;
-}
-
-.footer-history a {
-    font-size: 10px;
-    color: #bbb;
+.footer-link-subtle,
+.footer-link-subtle:visited,
+.footer-link-subtle:active {
+    color: inherit;
     text-decoration: none;
 }
 
-.footer-history a:hover {
+.footer-link-subtle:hover {
     color: #888;
+}
+
+.footer-links {
+    margin-top: 12px;
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+}
+
+.footer-links a {
+    font-size: 10px;
+    color: #bbb;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.footer-links a:hover {
+    color: #888;
+}
+
+/* 来源面板 */
+.sources-panel {
+    display: none;
+    margin-top: 16px;
+    text-align: left;
+    border-top: 1px solid var(--border-color);
+    padding-top: 12px;
+}
+
+.sources-panel.active {
+    display: block;
+}
+
+.sources-panel-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--sub-text);
+    margin-bottom: 8px;
+}
+
+.source-item {
+    font-size: 11px;
+    line-height: 1.6;
+    padding: 4px 0;
+    border-bottom: 1px solid #f0f0f0;
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+
+.source-item:last-child {
+    border-bottom: none;
+}
+
+.source-item a {
+    color: var(--accent-color);
+    text-decoration: none;
+}
+
+.source-item a:hover {
+    text-decoration: underline;
+}
+
+.source-author {
+    color: var(--text-color);
+    font-weight: 600;
+}
+
+.source-snippet {
+    color: #999;
+}
+
+.source-type {
+    display: inline-block;
+    font-size: 9px;
+    padding: 1px 4px;
+    border-radius: 3px;
+    background: #f0f0f0;
+    color: #999;
+    margin-right: 4px;
 }
 
 /* --- 打印/截图优化 --- */

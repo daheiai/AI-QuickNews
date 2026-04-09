@@ -23,12 +23,16 @@ def run_quick_mode():
     # 2. 生成快讯
     print("\n[2/3] 生成 AI 快讯...")
     analyzer = DigestAnalyzer(mode="quick")
-    analyzer.run()
+    digest_output = analyzer.run()
 
     # 3. 推送到飞书
     print("\n[3/3] 推送到飞书...")
     notifier = FeishuNotifier()
-    notifier.send_report(mode="quick")
+    notifier.send_digest_messages(
+        digest_output.primary_text,
+        digest_output.appendix_text,
+        mode="quick",
+    )
 
     print("\n快讯模式完成")
 
@@ -43,12 +47,16 @@ def run_daily_mode():
     print("\n[1/2] 生成 AI 日报...")
     yesterday = (dt.datetime.now() - dt.timedelta(days=1)).strftime("%Y-%m-%d")
     analyzer = DigestAnalyzer(mode="daily")
-    analyzer.run(date=yesterday)
+    digest_output = analyzer.run(date=yesterday)
 
     # 2. 推送到飞书
     print("\n[2/2] 推送到飞书...")
     notifier = FeishuNotifier()
-    notifier.send_report(mode="daily")
+    notifier.send_digest_messages(
+        digest_output.primary_text,
+        digest_output.appendix_text,
+        mode="daily",
+    )
 
     print("\n日报模式完成")
 

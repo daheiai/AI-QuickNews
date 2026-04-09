@@ -65,6 +65,24 @@ $issue_number = $data['issue_number'] ?? 504;
 $twitter_count = $data['source_stats']['twitter'] ?? 0;
 $rss_count = $data['source_stats']['rss'] ?? 0;
 
+// 为所有信源分配全局编号（用于论文式引用）
+$source_index_map = [];  // url => 编号
+$global_sources = [];    // 编号 => source 信息
+$current_index = 1;
+
+foreach ($data['items'] as $item) {
+    if (!empty($item['sources'])) {
+        foreach ($item['sources'] as $src) {
+            $url = $src['url'];
+            if (!isset($source_index_map[$url])) {
+                $source_index_map[$url] = $current_index;
+                $global_sources[$current_index] = $src;
+                $current_index++;
+            }
+        }
+    }
+}
+
 /**
  * 格式化品牌名用于显示
  */
@@ -108,7 +126,13 @@ function render_highlights($text) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>大黑AI速报</title>
+    <title>大黑AI速报｜AI日报｜每4小时更新</title>
+    <meta name="description" content="大黑AI速报（AI日报/AI快讯）：每4小时自动更新，覆盖模型动态、产品工具、技巧教程、硬件动态、行业资讯，快速了解最新AI热点。">
+    <meta name="keywords" content="AI速报,AI日报,AI快讯,AI新闻,每日AI,AI热点,大模型,OpenAI,Claude,Gemini,Qwen,DeepSeek">
+    <meta property="og:title" content="大黑AI速报（AI日报/AI快讯）">
+    <meta property="og:description" content="每4小时更新的AI速报与AI日报摘要，快速掌握最新AI热点与行业动态。">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://news.daheiai.com/realtime.php">
     <link rel="stylesheet" href="css/style.css">
     <link rel="alternate" type="application/rss+xml" title="大黑AI速报 RSS" href="rss.php">
 </head>
@@ -198,6 +222,12 @@ function render_highlights($text) {
                 <!-- 内容 -->
                 <div class="article-body">
                     <?php echo render_highlights($item['content']); ?>
+                    <?php if (!empty($item['sources'])): ?>
+                        <?php foreach ($item['sources'] as $src): ?>
+                            <?php $idx = $source_index_map[$src['url']]; ?>
+                            <sup><a href="<?php echo htmlspecialchars($src['url']); ?>" target="_blank" class="ref-link">[<?php echo $idx; ?>]</a></sup>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
                 </div>
             </article>
             <?php endforeach; ?>
@@ -223,6 +253,13 @@ function render_highlights($text) {
                 <div class="sources-panel-title">本期来源（共 <?php echo count($data['all_sources']); ?> 条）</div>
                 <?php foreach ($data['all_sources'] as $src): ?>
                 <div class="source-item">
+                    <?php
+                    // 查找该信源的编号
+                    $src_number = isset($source_index_map[$src['url']]) ? $source_index_map[$src['url']] : '';
+                    if ($src_number):
+                    ?>
+                    <span class="source-number">[<?php echo $src_number; ?>]</span>
+                    <?php endif; ?>
                     <span class="source-type"><?php echo $src['source_type'] === 'twitter' ? '推特' : 'RSS'; ?></span>
                     <span class="source-author"><?php echo htmlspecialchars($src['author']); ?></span>
                     <span class="source-snippet"><?php echo htmlspecialchars($src['snippet']); ?></span>

@@ -59,8 +59,13 @@ $has_more = $total_issues > $initial_count;
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>大黑AI速报 - 每4小时更新的AI行业快讯</title>
-    <meta name="description" content="AI 行业快讯速报，每4小时自动更新，涵盖模型动态、产品工具、技巧教程、硬件动态、行业资讯。">
+    <title>大黑AI速报 - 每4小时更新的AI行业快讯｜AI日报</title>
+    <meta name="description" content="大黑AI速报（AI日报/AI快讯）：每4小时自动更新，涵盖模型动态、产品工具、技巧教程、硬件动态、行业资讯，快速了解最新AI热点。">
+    <meta name="keywords" content="AI速报,AI日报,AI快讯,AI新闻,每日AI,AI热点,大黑AI速报,大黑AI日报,大模型,OpenAI,Claude,Gemini,Qwen,DeepSeek">
+    <meta property="og:title" content="大黑AI速报（AI日报/AI快讯）">
+    <meta property="og:description" content="每4小时更新的AI速报与AI日报摘要，瀑布流浏览历史期次，快速掌握最新AI热点。">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://news.daheiai.com/">
     <link rel="stylesheet" href="css/style.css">
     <link rel="alternate" type="application/rss+xml" title="大黑AI速报 RSS" href="rss.php">
     <style>

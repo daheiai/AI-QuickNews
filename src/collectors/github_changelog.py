@@ -1,4 +1,5 @@
 """GitHub Changelog 采集器 - 抓取、翻译、总结 GitHub Releases"""
+
 import json
 import sys
 from collections import OrderedDict
@@ -30,9 +31,9 @@ class GitHubChangelogCollector:
         self.recent_ids = self._load_recent_ids()
 
         # AI 配置
-        self.ai_base_url = config.OPENAI_BASE_URL
-        self.ai_api_key = config.OPENAI_API_KEY
-        self.ai_model = config.OPENAI_MODEL
+        self.ai_base_url = config.CHANGELOG_AI_BASE_URL
+        self.ai_api_key = config.CHANGELOG_AI_API_KEY
+        self.ai_model = config.CHANGELOG_AI_MODEL
 
     def _load_recent_ids(self) -> "OrderedDict[str, None]":
         """加载近期去重ID缓存"""
@@ -94,7 +95,9 @@ class GitHubChangelogCollector:
             headers["Authorization"] = f"Bearer {self.api_token}"
         return headers
 
-    def fetch_releases(self, owner: str, repo: str, since_time: datetime) -> Optional[List[dict]]:
+    def fetch_releases(
+        self, owner: str, repo: str, since_time: datetime
+    ) -> Optional[List[dict]]:
         """获取指定仓库的 releases，支持分页获取全部历史"""
         all_releases = []
         page = 1
@@ -103,7 +106,9 @@ class GitHubChangelogCollector:
             while True:
                 url = f"{self.GITHUB_API_BASE}/repos/{owner}/{repo}/releases"
                 params = {"per_page": 100, "page": page}
-                response = requests.get(url, headers=self._get_headers(), params=params, timeout=30)
+                response = requests.get(
+                    url, headers=self._get_headers(), params=params, timeout=30
+                )
                 response.raise_for_status()
                 releases = response.json()
 
@@ -113,7 +118,9 @@ class GitHubChangelogCollector:
                 # 过滤时间范围内的 releases
                 found_any = False
                 for release in releases:
-                    published_at = datetime.fromisoformat(release["published_at"].replace("Z", "+00:00"))
+                    published_at = datetime.fromisoformat(
+                        release["published_at"].replace("Z", "+00:00")
+                    )
                     if published_at >= since_time:
                         all_releases.append(release)
                         found_any = True
@@ -213,6 +220,7 @@ class GitHubChangelogCollector:
     def _call_ai(self, prompt: str, max_tokens: int = None, timeout: int = 180) -> str:
         """统一的 AI 调用方法"""
         import time
+
         start_time = time.time()
         self.log(f"  → 调用 AI ({self.ai_model})...")
         if max_tokens:
@@ -254,8 +262,10 @@ class GitHubChangelogCollector:
 
         results = []
         for i in range(0, len(releases), BATCH_SIZE):
-            batch = releases[i: i + BATCH_SIZE]
-            self.log(f"  批量处理第 {i + 1}-{i + len(batch)} 条 (共 {len(batch)} 条)...")
+            batch = releases[i : i + BATCH_SIZE]
+            self.log(
+                f"  批量处理第 {i + 1}-{i + len(batch)} 条 (共 {len(batch)} 条)..."
+            )
 
             # 构建批量请求
             items_text = ""
@@ -305,12 +315,16 @@ class GitHubChangelogCollector:
                 lookup = {item["idx"]: item for item in parsed}
                 for idx, r in enumerate(batch):
                     item = lookup.get(idx, {})
-                    results.append({
-                        "title_cn": item.get("title_cn", r["name"] or r["tag_name"]),
-                        "body_cn": item.get("body_cn", r["body"] or ""),
-                        "summary": item.get("summary", r["name"] or r["tag_name"]),
-                        "success": True  # 批量成功
-                    })
+                    results.append(
+                        {
+                            "title_cn": item.get(
+                                "title_cn", r["name"] or r["tag_name"]
+                            ),
+                            "body_cn": item.get("body_cn", r["body"] or ""),
+                            "summary": item.get("summary", r["name"] or r["tag_name"]),
+                            "success": True,  # 批量成功
+                        }
+                    )
 
             except Exception as e:
                 self.log(f"  ✗ 批量处理失败: {e}")
@@ -320,25 +334,36 @@ class GitHubChangelogCollector:
                     self.log(f"    处理第 {i + idx + 1} 条: {r['tag_name']}")
                     try:
                         title_cn = self._call_ai(
-                            f"翻译成中文，只返回翻译结果：{r['name'] or r['tag_name']}", max_tokens=200
+                            f"翻译成中文，只返回翻译结果：{r['name'] or r['tag_name']}",
+                            max_tokens=200,
                         )
-                        body_cn = self._call_ai(
-                            f"翻译成中文，保持格式，只返回翻译结果：\n{r['body'] or ''}", max_tokens=3000
-                        ) if r.get("body") else ""
+                        body_cn = (
+                            self._call_ai(
+                                f"翻译成中文，保持格式，只返回翻译结果：\n{r['body'] or ''}",
+                                max_tokens=3000,
+                            )
+                            if r.get("body")
+                            else ""
+                        )
                         summary = self._call_ai(
-                            f"用1-2句话总结这个更新日志的核心内容（中文，不超过100字）：\n{title_cn}\n{body_cn}", max_tokens=200
+                            f"用1-2句话总结这个更新日志的核心内容（中文，不超过100字）：\n{title_cn}\n{body_cn}",
+                            max_tokens=200,
                         )
                     except Exception as e2:
                         self.log(f"    ✗ 逐条处理也失败: {e2}")
                         title_cn = r["name"] or r["tag_name"]
                         body_cn = r["body"] or ""
                         summary = title_cn
-                    results.append({
-                        "title_cn": title_cn,
-                        "body_cn": body_cn,
-                        "summary": summary,
-                        "success": "✗ 逐条处理也失败" not in str(e2) if 'e2' in locals() else True
-                    })
+                    results.append(
+                        {
+                            "title_cn": title_cn,
+                            "body_cn": body_cn,
+                            "summary": summary,
+                            "success": "✗ 逐条处理也失败" not in str(e2)
+                            if "e2" in locals()
+                            else True,
+                        }
+                    )
 
         return results
 
@@ -369,7 +394,7 @@ class GitHubChangelogCollector:
                 body_cn = self._call_ai(
                     f"将以下内容翻译成中文，保持原有格式：\n{body_en}",
                     max_tokens=None,  # 不限制，让 AI 自己决定
-                    timeout=180
+                    timeout=180,
                 )
             else:
                 self.log(f"    → 无内容，跳过翻译")
@@ -450,7 +475,10 @@ class GitHubChangelogCollector:
                     if item.get("id") == release_id:
                         found = True
                         # 有英文内容但没中文翻译 → 需要重试
-                        if item.get("body_en", "").strip() and not item.get("body_cn", "").strip():
+                        if (
+                            item.get("body_en", "").strip()
+                            and not item.get("body_cn", "").strip()
+                        ):
                             return True
                         return False
             except (json.JSONDecodeError, OSError):
@@ -510,7 +538,9 @@ class GitHubChangelogCollector:
 
             output = {
                 "repo_name": repo_name,
-                "generated_at": datetime.now(self.BEIJING_TZ).strftime("%Y-%m-%d %H:%M:%S"),
+                "generated_at": datetime.now(self.BEIJING_TZ).strftime(
+                    "%Y-%m-%d %H:%M:%S"
+                ),
                 "total": len(repo_releases),
                 "releases": [
                     {
@@ -529,7 +559,9 @@ class GitHubChangelogCollector:
             # 保存到 changelog 目录
             safe_name = repo_name.lower().replace(" ", "_")
             output_file = self.changelog_json_dir / f"{safe_name}_latest.json"
-            output_file.write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")
+            output_file.write_text(
+                json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
 
     def build_since_time(self) -> datetime:
         """构建查询起始时间"""

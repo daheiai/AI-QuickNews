@@ -29,6 +29,126 @@ foreach ($repos as $r) {
     }
 }
 $total_repos = count($repo_order);
+
+// ========== 图表数据计算 ==========
+$chart_days = 30; // 最近30天
+$today = date('Y-m-d');
+$date_range = [];
+for ($i = $chart_days - 1; $i >= 0; $i--) {
+    $date_range[] = date('Y-m-d', strtotime("-{$i} days"));
+}
+
+// 按仓库统计每天发布数量
+$daily_counts = [];
+$repo_total_30d = [];
+
+foreach ($repo_order as $repo_name) {
+    $repo = $repos[$repo_name] ?? null;
+    $releases = $repo['releases'] ?? [];
+    $repo_total_30d[$repo_name] = 0;
+
+    foreach ($releases as $r) {
+        $date = substr($r['published_at'] ?? '', 0, 10);
+        if ($date && $date >= $date_range[0] && $date <= $today) {
+            if (!isset($daily_counts[$date])) $daily_counts[$date] = [];
+            if (!isset($daily_counts[$date][$repo_name])) $daily_counts[$date][$repo_name] = 0;
+            $daily_counts[$date][$repo_name]++;
+            $repo_total_30d[$repo_name]++;
+        }
+    }
+}
+
+// 构建 Chart.js 数据
+$chart_labels = json_encode(array_map(function($d) { return substr($d, 5); }, $date_range)); // MM-DD 格式
+
+// 每个仓库的数据
+$chart_datasets = [];
+$colors = [
+    'Claude Code' => '#FF6B6B',
+    'OpenCode' => '#4ECDC4',
+    'OpenClaw' => '#45B7D1',
+    'Gemini CLI' => '#96CEB4',
+    'Codex' => '#FFEAA7'
+];
+foreach ($repo_order as $repo_name) {
+    $data = [];
+    foreach ($date_range as $d) {
+        $data[] = $daily_counts[$d][$repo_name] ?? 0;
+    }
+    $chart_datasets[] = json_encode([
+        'label' => $repo_name,
+        'data' => $data,
+        'backgroundColor' => $colors[$repo_name] ?? '#999',
+        'borderColor' => $colors[$repo_name] ?? '#999',
+        'fill' => false,
+        'tension' => 0.3
+    ]);
+}
+
+$chart_labels_json = $chart_labels;
+$chart_datasets_json = implode(',', $chart_datasets);
+
+// ========== 新图表：预发布版本占比 ==========
+$prerelease_count = 0;
+$stable_count = 0;
+$repo_prerelease = []; // 各仓库预发布数量
+
+foreach ($repo_order as $repo_name) {
+    $repo = $repos[$repo_name] ?? null;
+    $releases = $repo['releases'] ?? [];
+    $repo_prerelease[$repo_name] = 0;
+    foreach ($releases as $r) {
+        if (!empty($r['is_prerelease'])) {
+            $prerelease_count++;
+            $repo_prerelease[$repo_name]++;
+        } else {
+            $stable_count++;
+        }
+    }
+}
+
+$prerelease_data = json_encode([
+    ['label' => '正式版', 'data' => $stable_count, 'backgroundColor' => '#4ECDC4'],
+    ['label' => '预发布版', 'data' => $prerelease_count, 'backgroundColor' => '#FF6B6B']
+]);
+
+// 各仓库预发布占比
+$prerelease_by_repo = [];
+foreach ($repo_order as $repo_name) {
+    $repo = $repos[$repo_name] ?? null;
+    $releases = $repo['releases'] ?? [];
+    $total = count($releases);
+    $prerelease = $repo_prerelease[$repo_name];
+    $prerelease_by_repo[] = json_encode([
+        'label' => $repo_name,
+        'data' => $total > 0 ? round($prerelease / $total * 100, 1) : 0,
+        'backgroundColor' => $colors[$repo_name] ?? '#999'
+    ]);
+}
+$prerelease_by_repo_json = implode(',', $prerelease_by_repo);
+
+// ========== 新图表：更新内容长度对比 ==========
+$repo_body_lengths = [];
+foreach ($repo_order as $repo_name) {
+    $repo = $repos[$repo_name] ?? null;
+    $releases = $repo['releases'] ?? [];
+    $total_len = 0;
+    $count = 0;
+    foreach ($releases as $r) {
+        $body = $r['body_cn'] ?? $r['body_en'] ?? '';
+        if ($body) {
+            $total_len += mb_strlen($body);
+            $count++;
+        }
+    }
+    $avg_len = $count > 0 ? round($total_len / $count) : 0;
+    $repo_body_lengths[] = json_encode([
+        'label' => $repo_name,
+        'data' => $avg_len,
+        'backgroundColor' => $colors[$repo_name] ?? '#999'
+    ]);
+}
+$body_length_json = implode(',', $repo_body_lengths);
 ?>
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -120,6 +240,39 @@ $total_repos = count($repo_order);
         </div>
     </section>
 
+    <!-- 图表区域 -->
+    <section class="chart-section">
+        <h2>数据分析</h2>
+
+        <!-- 第一排：2个 -->
+        <div class="chart-row row-2">
+            <div class="chart-container">
+                <h3>各仓库发布数量 <span class="chart-hint">（近30天）</span></h3>
+                <canvas id="barChart"></canvas>
+            </div>
+            <div class="chart-container">
+                <h3>版本类型分布 <span class="chart-hint">（全部）</span></h3>
+                <canvas id="pieChart"></canvas>
+            </div>
+        </div>
+
+        <!-- 第二排：3个 -->
+        <div class="chart-row row-3">
+            <div class="chart-container">
+                <h3>每日发布趋势 <span class="chart-hint">（近30天）</span></h3>
+                <canvas id="lineChart"></canvas>
+            </div>
+            <div class="chart-container">
+                <h3>各仓库预发布占比 <span class="chart-hint">（全部）</span></h3>
+                <canvas id="prereleaseBarChart"></canvas>
+            </div>
+            <div class="chart-container">
+                <h3>平均更新内容长度 <span class="chart-hint">（字符数）</span></h3>
+                <canvas id="lengthChart"></canvas>
+            </div>
+        </div>
+    </section>
+
     <!-- 更新趋势 -->
     <section class="trend-section">
         <h2>近期更新趋势</h2>
@@ -160,6 +313,154 @@ $total_repos = count($repo_order);
         </div>
     </footer>
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// 图表数据
+const chartLabels = <?php echo $chart_labels_json; ?>;
+const chartDatasets = [<?php echo $chart_datasets_json; ?>];
+const repoOrder = <?php echo json_encode($repo_order); ?>;
+
+// 柱状图：各仓库发布数量
+new Chart(document.getElementById('barChart'), {
+    type: 'bar',
+    data: {
+        labels: chartLabels,
+        datasets: chartDatasets.map(ds => ({
+            ...ds,
+            backgroundColor: ds.borderColor,
+            borderWidth: 1
+        }))
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+            legend: { position: 'bottom' }
+        },
+        scales: {
+            y: { beginAtZero: true, ticks: { stepSize: 1 } }
+        }
+    }
+});
+
+// 饼图：版本类型分布
+new Chart(document.getElementById('pieChart'), {
+    type: 'pie',
+    data: {
+        labels: ['正式版', '预发布版'],
+        datasets: [{
+            data: [<?php echo $stable_count; ?>, <?php echo $prerelease_count; ?>],
+            backgroundColor: ['#4ECDC4', '#FF6B6B']
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+            legend: { position: 'bottom' }
+        }
+    }
+});
+
+// 折线图：每日发布趋势
+new Chart(document.getElementById('lineChart'), {
+    type: 'line',
+    data: {
+        labels: chartLabels,
+        datasets: chartDatasets
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+            legend: { position: 'bottom' }
+        },
+        scales: {
+            y: { beginAtZero: true, ticks: { stepSize: 1 } }
+        },
+        interaction: {
+            mode: 'index',
+            intersect: false
+        }
+    }
+});
+
+// 柱状图：各仓库预发布占比
+new Chart(document.getElementById('prereleaseBarChart'), {
+    type: 'bar',
+    data: {
+        labels: repoOrder,
+        datasets: [{
+            label: '预发布占比(%)',
+            data: [<?php
+                $lengths = [];
+                foreach ($repo_order as $repo_name) {
+                    $repo = $repos[$repo_name] ?? null;
+                    $releases = $repo['releases'] ?? [];
+                    $total = count($releases);
+                    $prerelease = 0;
+                    foreach ($releases as $rel) { if (!empty($rel['is_prerelease'])) $prerelease++; }
+                    $lengths[] = $total > 0 ? round($prerelease / $total * 100, 1) : 0;
+                }
+                echo implode(',', $lengths);
+            ?>],
+            backgroundColor: ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7']
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        indexAxis: 'y',
+        plugins: {
+            legend: { display: false }
+        },
+        scales: {
+            x: { beginAtZero: true, max: 100 }
+        }
+    }
+});
+
+// 柱状图：平均更新内容长度
+new Chart(document.getElementById('lengthChart'), {
+    type: 'bar',
+    data: {
+        labels: repoOrder,
+        datasets: [{
+            label: '平均字符数',
+            data: [<?php
+                $lengths = [];
+                foreach ($repo_order as $repo_name) {
+                    $repo = $repos[$repo_name] ?? null;
+                    $releases = $repo['releases'] ?? [];
+                    $total_len = 0;
+                    $count = 0;
+                    foreach ($releases as $r) {
+                        $body = $r['body_cn'] ?? $r['body_en'] ?? '';
+                        if ($body) {
+                            $total_len += mb_strlen($body);
+                            $count++;
+                        }
+                    }
+                    $lengths[] = $count > 0 ? round($total_len / $count) : 0;
+                }
+                echo implode(',', $lengths);
+            ?>],
+            backgroundColor: ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7']
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+            legend: { display: false }
+        },
+        scales: {
+            y: { beginAtZero: true }
+        }
+    }
+});
+</script>
 
 <script>
 // 每个卡片当前显示的版本索引和语言

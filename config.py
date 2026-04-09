@@ -1,4 +1,5 @@
 """统一配置管理模块"""
+
 import os
 from pathlib import Path
 from dotenv import load_dotenv
@@ -40,32 +41,57 @@ GITHUB_REPOS = [
 ]
 
 # 确保目录存在
-for path in (SOURCES_DIR, EVENTS_DIR, TWITTER_DIR, RSS_DIR, GITHUB_DIR, REPORTS_DIR, LOGS_DIR, WEB_JSON_DIR, CHANGELOG_JSON_DIR, SCREENSHOTS_DIR):
+for path in (
+    SOURCES_DIR,
+    EVENTS_DIR,
+    TWITTER_DIR,
+    RSS_DIR,
+    GITHUB_DIR,
+    REPORTS_DIR,
+    LOGS_DIR,
+    WEB_JSON_DIR,
+    CHANGELOG_JSON_DIR,
+    SCREENSHOTS_DIR,
+):
     path.mkdir(parents=True, exist_ok=True)
 
 # Twitter 配置
 TWITTER_API_KEY = os.getenv("TWITTER_API_KEY", "")
-TWITTER_USERNAMES = os.getenv(
-    "TWITTER_USERNAMES",
-    "Alibaba_Qwen,deepseek_ai"
-).split(",")    
+TWITTER_USERNAMES = os.getenv("TWITTER_USERNAMES", "Alibaba_Qwen,deepseek_ai").split(
+    ","
+)
 TWITTER_CHECK_INTERVAL_HOURS = int(os.getenv("TWITTER_CHECK_INTERVAL_HOURS", "4"))
 TWITTER_MAX_PAGES = int(os.getenv("TWITTER_MAX_PAGES", "10"))
 
 # RSS 配置
 _rss_feeds_path = Path(os.getenv("RSS_FEEDS_PATH", "resources/rss_feeds.json"))
-RSS_FEEDS_PATH = _rss_feeds_path if _rss_feeds_path.is_absolute() else BASE_DIR / _rss_feeds_path
+RSS_FEEDS_PATH = (
+    _rss_feeds_path if _rss_feeds_path.is_absolute() else BASE_DIR / _rss_feeds_path
+)
 RSS_LOOKBACK_HOURS = int(os.getenv("RSS_LOOKBACK_HOURS", "4"))
 RSS_MAX_ITEMS_PER_FEED = int(os.getenv("RSS_MAX_ITEMS_PER_FEED", "50"))
 RSS_REQUEST_TIMEOUT = int(os.getenv("RSS_REQUEST_TIMEOUT", "10"))
 RSS_MAX_WORKERS = int(os.getenv("RSS_MAX_WORKERS", "20"))
 
 # RSS AI 预处理配置（默认复用主模型）
-RSS_AI_MODEL = os.getenv("RSS_AI_MODEL", "") or os.getenv("OPENAI_MODEL", "deepseek-chat")
+RSS_AI_MODEL = os.getenv("RSS_AI_MODEL", "") or os.getenv(
+    "OPENAI_MODEL", "deepseek-chat"
+)
 RSS_AI_BASE_URL = os.getenv("RSS_AI_BASE_URL", "") or os.getenv("OPENAI_BASE_URL", "")
 RSS_AI_API_KEY = os.getenv("RSS_AI_API_KEY", "") or os.getenv("OPENAI_API_KEY", "")
 RSS_AI_BATCH_SIZE = int(os.getenv("RSS_AI_BATCH_SIZE", "20"))
 RSS_AI_MAX_TOKENS = int(os.getenv("RSS_AI_MAX_TOKENS", "2000"))
+
+# GitHub Changelog AI 配置（默认复用主模型）
+CHANGELOG_AI_MODEL = os.getenv("CHANGELOG_AI_MODEL", "") or os.getenv(
+    "OPENAI_MODEL", "deepseek-chat"
+)
+CHANGELOG_AI_BASE_URL = os.getenv("CHANGELOG_AI_BASE_URL", "") or os.getenv(
+    "OPENAI_BASE_URL", ""
+)
+CHANGELOG_AI_API_KEY = os.getenv("CHANGELOG_AI_API_KEY", "") or os.getenv(
+    "OPENAI_API_KEY", ""
+)
 
 # AI 模型配置
 OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "")
@@ -76,7 +102,9 @@ OPENAI_MODEL = os.getenv("OPENAI_MODEL", "deepseek-chat")
 FEISHU_APP_ID = os.getenv("FEISHU_APP_ID", "")
 FEISHU_APP_SECRET = os.getenv("FEISHU_APP_SECRET", "")
 FEISHU_CHAT_ID = os.getenv("FEISHU_CHAT_ID", "")
-FEISHU_TOKEN_CACHE = Path(os.getenv("FEISHU_TOKEN_CACHE", "~/.cache/feishu_token.json")).expanduser()
+FEISHU_TOKEN_CACHE = Path(
+    os.getenv("FEISHU_TOKEN_CACHE", "~/.cache/feishu_token.json")
+).expanduser()
 
 # 摘要配置
 QUICK_DIGEST_LIMIT = int(os.getenv("QUICK_DIGEST_LIMIT", "30"))

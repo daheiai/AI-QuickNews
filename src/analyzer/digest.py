@@ -586,7 +586,7 @@ class DigestAnalyzer:
 
         lines = [
             "\n\n---",
-            "以下是近48小时内已报道的标题。请避免重复报道相同内容。",
+            f"以下是近{hours}小时内已报道的标题。请避免重复报道相同内容。",
             "但如果某事件有了重要后续进展（如新测评结果、官方回应、版本更新、新数据公布等），应作为新条目报道。",
             "",
             "已报道标题：",
@@ -594,8 +594,56 @@ class DigestAnalyzer:
         for t in recent_titles:
             lines.append(f"- {t}")
 
-        print(f"[去重] 加载了 {len(recent_titles)} 条近48小时已报道标题")
+        print(f"[去重] 加载了 {len(recent_titles)} 条近{hours}小时已报道标题")
         return "\n".join(lines)
+
+    def _load_recent_source_urls(self, hours: int = 48) -> set:
+        """从最近的 web-json 文件中提取已报道的 sources.url（用于硬去重）"""
+        cutoff = dt.datetime.now() - dt.timedelta(hours=hours)
+        urls: set = set()
+
+        json_dir = config.WEB_JSON_DIR
+        if not json_dir.exists():
+            return urls
+
+        for f in sorted(json_dir.glob("quick_????-??-??_????.json"), reverse=True):
+            try:
+                ts_str = f.stem.replace("quick_", "")
+                file_time = dt.datetime.strptime(ts_str, "%Y-%m-%d_%H%M")
+            except ValueError:
+                continue
+
+            if file_time < cutoff:
+                break
+
+            try:
+                data = json.loads(f.read_text(encoding="utf-8"))
+                for item in data.get("items", []):
+                    for src in item.get("sources", []) or []:
+                        url = (src.get("url") or "").strip()
+                        if url:
+                            urls.add(url)
+            except (json.JSONDecodeError, OSError, AttributeError):
+                continue
+
+        return urls
+
+    def _filter_events_by_recent_sources(self, events: Sequence[Event], hours: int = 48) -> List[Event]:
+        """基于近 hours 小时内已出现过的 sources.url，对 event 做硬去重过滤"""
+        recent_urls = self._load_recent_source_urls(hours=hours)
+        if not recent_urls:
+            return list(events)
+
+        filtered: List[Event] = []
+        skipped = 0
+        for e in events:
+            if getattr(e, "url", None) and e.url in recent_urls:
+                skipped += 1
+                continue
+            filtered.append(e)
+
+        print(f"[去重] 硬去重(按sources.url) 过滤 {skipped} 条，剩余 {len(filtered)} 条")
+        return filtered
 
     def call_ai(self, prompt: str) -> str:
         """调用 AI 模型"""
@@ -628,7 +676,21 @@ class DigestAnalyzer:
         response.raise_for_status()
         data = response.json()
 
-        return data["choices"][0]["message"]["content"].strip()
+        # Debug: 某些模型/中转会把内容放在 message.reasoning 或返回空 content
+        try:
+            msg = (data.get("choices") or [{}])[0].get("message") or {}
+            content = (msg.get("content") or "")
+            reasoning = (msg.get("reasoning") or "")
+            if not content.strip() and reasoning.strip():
+                print(f"[ai_debug] content 为空，但 reasoning 非空 (len={len(reasoning)}). 将使用 reasoning 作为降级输出")
+                content = reasoning
+            if not content.strip():
+                print(f"[ai_debug] content/reasoning 均为空。response keys={list(data.keys())} choices0_keys={list(((data.get('choices') or [{}])[0]) .keys())}")
+        except Exception as e:
+            print(f"[ai_debug] 解析 AI 响应结构失败: {e}")
+            content = data["choices"][0]["message"]["content"]
+
+        return content.strip()
 
     def save_report(self, summary: str, selected_events: Sequence[Event], heading: str) -> DigestOutput:
         """生成并保存报告，同时返回飞书友好的文本"""
@@ -881,6 +943,11 @@ class DigestAnalyzer:
 
         limit = limit or self.settings.default_limit
         selected = self.select_top_events(events, limit=min(limit, len(events)))
+
+        # 先做程序侧硬去重：如果 sources.url 在近48小时速报中出现过，则跳过
+        selected = self._filter_events_by_recent_sources(selected, hours=48)
+        if not selected:
+            raise ValueError("去重后没有可用事件，停止生成摘要。")
 
         # 构建 prompt 并调用 AI（附加去重信息）
         prompt = self.build_prompt(selected)

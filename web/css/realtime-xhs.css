@@ -1,17 +1,17 @@
 /**
- * AI 快讯网页样式
- * 简约报刊风 - 米白背景 + 深黑文字 + 橙色强调
- * 针对手机截图优化 (390px)
+ * AI 快讯网页样式 - 小红书版
+ * 固定 768x1024 (3:4) 比例
+ * 基于 style.css 放大
  */
 
 /* 核心配色 */
 :root {
-    --bg-color: #FAF9F6;      /* 米白色背景 */
-    --text-color: #1A1A1A;    /* 深黑色字体 */
-    --accent-color: #FF6B00;  /* 橙色高亮 */
-    --sub-text: #666666;      /* 次级文字 */
-    --border-color: #eee;     /* 分隔线 */
-    --banner-bg: #F2F0EB;     /* Banner背景 */
+    --bg-color: #FAF9F6;
+    --text-color: #1A1A1A;
+    --accent-color: #FF6B00;
+    --sub-text: #666666;
+    --border-color: #eee;
+    --banner-bg: #F2F0EB;
 }
 
 * {
@@ -27,14 +27,15 @@ body {
     justify-content: center;
 }
 
-/* 强制 390px 容器 */
-.mobile-wrapper {
-    width: 390px;
+/* 固定 768x1100 容器 */
+.xhs-wrapper {
+    width: 768px;
+    height: 1100px;
     background-color: var(--bg-color);
-    min-height: 100vh;
     color: var(--text-color);
-    padding-bottom: 50px;
-    box-shadow: 0 0 20px rgba(0,0,0,0.05);
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 0 30px rgba(0,0,0,0.1);
 }
 
 /* --- 顶部 Banner --- */
@@ -65,7 +66,7 @@ body {
     filter: blur(6px);
 }
 
-/* Logo 位置分布 - 更大更模糊，作为点缀 */
+/* Logo 位置分布 */
 .banner-logo-blur:nth-child(1) { top: -10px; left: -10px; width: 90px; height: 90px; }
 .banner-logo-blur:nth-child(2) { top: 40px; left: 80px; width: 70px; height: 70px; }
 .banner-logo-blur:nth-child(3) { top: -15px; left: 160px; width: 75px; height: 75px; }
@@ -103,8 +104,8 @@ body {
 /* 右下角信息区 */
 .banner-info {
     position: absolute;
-    right: 20px;
-    bottom: 20px;
+    right: 40px;
+    bottom: 30px;
     text-align: right;
     display: flex;
     flex-direction: column;
@@ -113,44 +114,45 @@ body {
 }
 
 .banner-avatar {
-    width: 32px;
-    height: 32px;
+    width: 64px;
+    height: 64px;
     border-radius: 50%;
     object-fit: cover;
-    margin-bottom: 6px;
+    margin-bottom: 10px;
+    border: 2px solid var(--text-color);
 }
 
 .banner-title {
     font-family: "Noto Serif SC", "Songti SC", serif;
-    font-size: 18px;
+    font-size: 36px;
     font-weight: 900;
-    letter-spacing: 1px;
+    letter-spacing: 2px;
 }
 
 .banner-date {
-    font-size: 11px;
+    font-size: 18px;
     font-family: "SF Mono", "Monaco", monospace;
-    margin-top: 2px;
+    margin-top: 4px;
     color: var(--sub-text);
 }
 
 /* --- AI 总结 --- */
 .ai-summary {
-    padding: 30px 20px;
+    padding: 40px;
     border-bottom: 1px solid var(--border-color);
 }
 
 .section-label {
     display: inline-block;
     color: var(--accent-color);
-    font-size: 12px;
+    font-size: 18px;
     font-weight: bold;
     letter-spacing: 2px;
-    margin-bottom: 12px;
+    margin-bottom: 16px;
 }
 
 .summary-content {
-    font-size: 16px;
+    font-size: 26px;
     font-weight: 600;
     line-height: 1.7;
     text-align: justify;
@@ -165,7 +167,7 @@ strong {
 
 /* --- 内容区块 --- */
 .content-block {
-    padding: 35px 20px;
+    padding: 40px;
     border-bottom: 1px solid var(--border-color);
 }
 
@@ -176,16 +178,16 @@ strong {
 /* 分类标题 */
 .category-header {
     font-family: "Noto Serif SC", "Songti SC", serif;
-    font-size: 24px;
+    font-size: 32px;
     font-weight: 900;
-    border-left: 4px solid var(--text-color);
-    padding-left: 12px;
-    margin-bottom: 30px;
+    border-left: 6px solid var(--text-color);
+    padding-left: 16px;
+    margin-bottom: 35px;
 }
 
 /* 文章条目 */
 .article-item {
-    margin-bottom: 40px;
+    margin-bottom: 50px;
 }
 
 .article-item:last-child {
@@ -196,27 +198,27 @@ strong {
 .article-meta {
     display: flex;
     align-items: center;
-    gap: 8px;
-    margin-bottom: 12px;
+    gap: 12px;
+    margin-bottom: 16px;
 }
 
 .article-logos {
     display: flex;
-    gap: 4px;
+    gap: 6px;
 }
 
 .article-logo {
-    width: 20px;
-    height: 20px;
-    border-radius: 4px;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
     object-fit: contain;
     background: #f5f5f5;
-    padding: 2px;
+    padding: 4px;
 }
 
 .article-keywords {
     font-family: "SF Mono", "Monaco", monospace;
-    font-size: 13px;
+    font-size: 18px;
     color: var(--sub-text);
     text-transform: uppercase;
     letter-spacing: 1px;
@@ -225,16 +227,16 @@ strong {
 /* 文章标题 */
 .article-title {
     font-family: "Noto Serif SC", "Songti SC", serif;
-    font-size: 22px;
+    font-size: 30px;
     font-weight: 900;
     line-height: 1.3;
-    margin-bottom: 15px;
+    margin-bottom: 18px;
     color: var(--text-color);
 }
 
 /* 文章内容 */
 .article-body {
-    font-size: 15px;
+    font-size: 22px;
     color: #333;
     line-height: 1.6;
     text-align: justify;
@@ -244,19 +246,25 @@ strong {
 
 /* --- 页脚 --- */
 .footer {
-    padding: 24px 20px;
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 16px 40px;
     text-align: center;
     color: var(--sub-text);
-    font-size: 12px;
+    font-size: 14px;
     line-height: 1.8;
     border-top: 1px solid var(--border-color);
-    margin-top: 20px;
+    background: linear-gradient(180deg, var(--bg-color) 0%, #F5F3EF 100%);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
 .footer-source {
-    font-size: 11px;
+    font-size: 14px;
     color: #999;
-    margin-top: 4px;
 }
 
 .footer-link-subtle,
@@ -270,91 +278,33 @@ strong {
     color: #888;
 }
 
-.footer-links {
-    margin-top: 12px;
-    display: flex;
-    justify-content: center;
-    gap: 16px;
-}
-
-.footer-links a {
-    font-size: 10px;
-    color: #bbb;
-    text-decoration: none;
-    cursor: pointer;
-}
-
-.footer-links a:hover {
-    color: #888;
-}
-
-/* 来源面板 */
-.sources-panel {
-    display: none;
-    margin-top: 16px;
-    text-align: left;
-    border-top: 1px solid var(--border-color);
-    padding-top: 12px;
-}
-
-.sources-panel.active {
-    display: block;
-}
-
-.sources-panel-title {
+/* 小红书链接 */
+.footer-xhs-link {
     font-size: 12px;
+    color: #999;
+}
+
+/* 分页指示器 */
+.footer-pagination {
+    display: flex;
+    align-items: center;
+    gap: 4px;
     font-weight: 600;
+}
+
+.page-num {
+    color: var(--accent-color);
+    font-size: 20px;
+}
+
+.page-divider {
     color: var(--sub-text);
-    margin-bottom: 8px;
+    font-size: 16px;
 }
 
-.source-item {
-    font-size: 11px;
-    line-height: 1.6;
-    padding: 4px 0;
-    border-bottom: 1px solid #f0f0f0;
-    overflow-wrap: break-word;
-    word-break: break-word;
-}
-
-.source-item:last-child {
-    border-bottom: none;
-}
-
-.source-item a {
-    color: var(--accent-color);
-    text-decoration: none;
-}
-
-.source-item a:hover {
-    text-decoration: underline;
-}
-
-.source-author {
-    color: var(--text-color);
-    font-weight: 600;
-}
-
-.source-snippet {
-    color: #999;
-}
-
-.source-type {
-    display: inline-block;
-    font-size: 9px;
-    padding: 1px 4px;
-    border-radius: 3px;
-    background: #f0f0f0;
-    color: #999;
-    margin-right: 4px;
-}
-
-.source-number {
-    display: inline-block;
-    color: var(--accent-color);
-    font-weight: 700;
-    font-size: 10px;
-    margin-right: 6px;
+.page-total {
+    color: var(--sub-text);
+    font-size: 16px;
 }
 
 /* --- 论文式引用标记 --- */
@@ -362,19 +312,10 @@ strong {
     color: var(--accent-color);
     text-decoration: none;
     font-weight: 600;
-    margin: 0 2px;
-    font-size: 0.9em;
+    margin: 0 3px;
+    font-size: 0.85em;
 }
 
 .ref-link:hover {
     text-decoration: underline;
-}
-
-/* --- 打印/截图优化 --- */
-@media print {
-    body {
-        background-color: var(--bg-color) !important;
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
-    }
 }

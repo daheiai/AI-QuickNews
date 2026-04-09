@@ -75,6 +75,28 @@ foreach ($feed_items as $item) {
             $content_html .= '<li>';
             $content_html .= '<strong>[' . htmlspecialchars($category_name) . '] ' . $news_title . '</strong><br/>';
             $content_html .= $news_content;
+
+            // 信源信息
+            $sources = $news_item['sources'] ?? [];
+            if (!empty($sources)) {
+                $source_type_labels = ['twitter' => '𝕏/Twitter', 'rss' => 'RSS', 'web' => 'Web'];
+                $source_parts = [];
+                foreach ($sources as $src) {
+                    $src_author = htmlspecialchars($src['author'] ?? '');
+                    $src_url = htmlspecialchars($src['url'] ?? '');
+                    $src_type = $src['source_type'] ?? '';
+                    $src_label = $source_type_labels[$src_type] ?? $src_type;
+                    if ($src_url) {
+                        $source_parts[] = '<a href="' . $src_url . '">' . ($src_author ?: $src_label) . '</a>' . ($src_label ? ' [' . $src_label . ']' : '');
+                    } elseif ($src_author) {
+                        $source_parts[] = htmlspecialchars($src_author) . ($src_label ? ' [' . $src_label . ']' : '');
+                    }
+                }
+                if (!empty($source_parts)) {
+                    $content_html .= '<br/><small>来源：' . implode('　', $source_parts) . '</small>';
+                }
+            }
+
             $content_html .= '</li>';
         }
         $content_html .= '</ul>';

@@ -13,61 +13,101 @@ import config
 from src.aggregator.events import EventAggregator
 
 
+# ============ 期数计数器 ============
+ISSUE_COUNTER_FILE = config.DATA_DIR / "issue_counter.json"
+ISSUE_START_NUMBER = 504  # 起始期数
+
+
+def get_next_issue_number() -> int:
+    """获取下一期期数并自增"""
+    if ISSUE_COUNTER_FILE.exists():
+        try:
+            data = json.loads(ISSUE_COUNTER_FILE.read_text(encoding="utf-8"))
+            current = data.get("issue_number", ISSUE_START_NUMBER - 1)
+        except (json.JSONDecodeError, KeyError):
+            current = ISSUE_START_NUMBER - 1
+    else:
+        current = ISSUE_START_NUMBER - 1
+
+    next_number = current + 1
+    ISSUE_COUNTER_FILE.write_text(
+        json.dumps({"issue_number": next_number}, ensure_ascii=False),
+        encoding="utf-8"
+    )
+    return next_number
+
+
+def get_current_issue_number() -> int:
+    """获取当前期数（不自增）"""
+    if ISSUE_COUNTER_FILE.exists():
+        try:
+            data = json.loads(ISSUE_COUNTER_FILE.read_text(encoding="utf-8"))
+            return data.get("issue_number", ISSUE_START_NUMBER)
+        except (json.JSONDecodeError, KeyError):
+            pass
+    return ISSUE_START_NUMBER
+
+
 # ============ 品牌配置（Logo 匹配）============
 # 关键词匹配采用大小写不敏感
+# 注意：避免使用过短或过于通用的关键词，防止误匹配
 BRAND_KEYWORDS = {
     # 主流大模型
-    "openai": ["openai", "gpt", "chatgpt", "sora", "dall-e", "dalle", "o1", "o3", "o4", "gpt-4", "gpt-5", "codex"],
-    "claude": ["claude", "anthropic"],
-    "deepseek": ["deepseek", "deep seek", "深度求索"],
-    "gemini": ["gemini", "bard"],
-    "gemma": ["gemma"],
-    "meta": ["meta ai", "llama", "meta llama"],
-    "mistral": ["mistral", "mixtral", "pixtral"],
-    "cohere": ["cohere", "command-r", "command r"],
-    "xai": ["xai", "x.ai", "grok"],
+    "openai": ["openai", "chatgpt", "gpt-4", "gpt-5", "gpt4", "gpt5", "dall-e", "dalle", "openai o1", "openai o3", "gpt-o1", "gpt-o3", "codex"],
+    "claude": ["claude", "anthropic", "claude 3", "claude opus", "claude sonnet"],
+    "deepseek": ["deepseek", "deep seek", "深度求索", "deepseek-v", "deepseek-r1"],
+    "gemini": ["gemini", "gemini pro", "gemini ultra", "google gemini"],
+    "gemma": ["gemma", "google gemma", "gemma-2"],
+    "meta": ["meta ai", "llama", "meta llama", "llama-2", "llama-3", "llama2", "llama3"],
+    "mistral": ["mistral", "mixtral", "pixtral", "mistral ai"],
+    "cohere": ["cohere", "command-r", "command r", "cohere ai"],
+    "xai": ["xai", "x.ai", "grok", "grok-2", "grok-3"],
 
     # 国内大模型
-    "qwen": ["qwen", "通义", "千问"],
-    "alibaba": ["alibaba", "阿里巴巴", "阿里云"],
-    "kimi": ["kimi", "moonshot", "月之暗面"],
-    "minimax": ["minimax", "海螺", "hailuo"],
-    "zhipu": ["zhipu", "智谱", "glm", "chatglm"],
-    "baidu": ["baidu", "百度", "ernie", "文心"],
-    "doubao": ["doubao", "豆包"],
-    "bytedance": ["bytedance", "字节跳动"],
-    "hunyuan": ["hunyuan", "混元", "腾讯"],
-    "spark": ["spark", "讯飞星火", "星火"],
-    "tiangong": ["tiangong", "天工", "昆仑万维"],
+    "qwen": ["qwen", "qwen2", "qwen3", "通义千问", "通义"],
+    "alibaba": ["alibaba cloud", "阿里巴巴", "阿里云", "alibaba ai"],
+    "kimi": ["kimi", "moonshot", "月之暗面", "kimi chat"],
+    "minimax": ["minimax", "海螺ai", "hailuo ai", "海螺视频", "M2.1", "M2", "M2.2"],
+    "zhipu": ["zhipu", "智谱", "chatglm", "glm-4", "glm-3", "智谱清言","GLM"],
+    "baidu": ["baidu ai", "百度ai", "ernie", "文心一言", "文心大模型"],
+    "doubao": ["doubao", "豆包", "字节豆包"],
+    "bytedance": ["bytedance ai", "字节跳动ai"],
+    "hunyuan": ["hunyuan", "混元", "腾讯混元", "腾讯ai"],
+    "spark": ["讯飞星火", "星火大模型", "星火认知", "iflytek spark"],
+    "tiangong": ["tiangong", "天工ai", "天工大模型", "昆仑万维"],
 
     # 图像/视频生成
-    "stability": ["stability", "stable diffusion", "sdxl", "sd3"],
-    "midjourney": ["midjourney", "mj"],
-    "runway": ["runway", "gen-2", "gen-3", "gen2", "gen3"],
-    "pika": ["pika labs", "pika"],
-    "flux": ["flux", "black forest"],
-    "ideogram": ["ideogram"],
+    "stability": ["stability ai", "stable diffusion", "sdxl", "sd3", "stability.ai"],
+    "midjourney": ["midjourney"],
+    "runway": ["runway", "runwayml", "runway gen"],
+    "pika": ["pika labs", "pika ai", "pika视频"],
+    "flux": ["flux.1", "flux ai", "black forest labs", "flux模型"],
+    "ideogram": ["ideogram", "ideogram ai"],
     "pixverse": ["pixverse"],
-    "haiper": ["haiper"],
-    "viggle": ["viggle"],
+    "haiper": ["haiper ai", "haiper"],
+    "viggle": ["viggle ai", "viggle"],
     "civitai": ["civitai"],
-    "novelai": ["novelai", "nai"],
+    "novelai": ["novelai", "novel ai"],
     "clipdrop": ["clipdrop"],
+    "kling": ["kling ai", "可灵", "快手可灵"],
+    "sora": ["openai sora", "sora视频", "sora ai"],
 
     # 音频生成
-    "suno": ["suno"],
-    "udio": ["udio"],
+    "suno": ["suno ai", "suno音乐"],
+    "udio": ["udio ai", "udio音乐"],
 
     # 开发工具
     "github": ["github"],
-    "copilot": ["copilot", "github copilot"],
-    "cursor": ["cursor"],
+    "copilot": ["github copilot", "copilot ai"],
+    "cursor": ["cursor ai", "cursor编辑器", "cursor ide"],
     "windsurf": ["windsurf", "codeium"],
-    "cline": ["cline"],
-    "manus": ["manus"],
+    "cline": ["cline ai", "cline插件"],
+    "manus": ["manus ai"],
+    "devin": ["devin ai", "cognition devin"],
+    "replit": ["replit", "replit ai"],
 
     # 平台/工具
-    "huggingface": ["huggingface", "hugging face", "hf"],
+    "huggingface": ["huggingface", "hugging face", "🤗"],
     "ollama": ["ollama"],
     "gradio": ["gradio"],
     "langchain": ["langchain"],
@@ -75,35 +115,44 @@ BRAND_KEYWORDS = {
     "openwebui": ["open webui", "openwebui"],
     "lmstudio": ["lm studio", "lmstudio"],
     "vllm": ["vllm"],
-    "dify": ["dify"],
-    "coze": ["coze", "扣子"],
+    "dify": ["dify", "dify ai"],
+    "coze": ["coze", "扣子", "字节扣子"],
     "n8n": ["n8n"],
-    "notion": ["notion"],
-    "notebooklm": ["notebooklm", "notebook lm"],
-    "mcp": ["model context protocol", "mcp server"],
+    "notion": ["notion ai"],
+    "notebooklm": ["notebooklm", "notebook lm", "google notebooklm"],
+    "mcp": ["model context protocol", "mcp协议", "mcp server"],
 
     # 云服务/硬件
-    "google": ["google", "deepmind"],
-    "nvidia": ["nvidia", "英伟达", "rtx", "h100", "h200", "b100", "b200", "blackwell"],
-    "microsoft": ["microsoft", "微软"],
-    "apple": ["apple ai", "苹果"],
-    "azure": ["azure"],
-    "cloudflare": ["cloudflare"],
-    "huawei": ["huawei", "华为", "昇腾"],
+    "google": ["google ai", "google deepmind", "deepmind"],
+    "nvidia": ["nvidia", "英伟达", "h100", "h200", "b100", "b200", "blackwell", "geforce", "cuda"],
+    "microsoft": ["microsoft ai", "微软ai", "azure ai"],
+    "apple": ["apple intelligence", "apple ai", "苹果ai"],
+    "azure": ["azure openai", "azure ml"],
+    "cloudflare": ["cloudflare ai", "cloudflare workers ai"],
+    "huawei": ["huawei ai", "华为ai", "昇腾", "盘古大模型"],
+    "amd": ["amd ai", "amd mi300", "amd instinct"],
+    "intel": ["intel ai", "intel gaudi"],
 
     # API 聚合/推理平台
     "openrouter": ["openrouter"],
     "deepinfra": ["deepinfra"],
-    "fireworks": ["fireworks"],
+    "fireworks": ["fireworks ai", "fireworks.ai"],
     "cerebras": ["cerebras"],
     "siliconcloud": ["siliconcloud", "硅基流动"],
+    "groq": ["groq", "groq ai"],
+    "together": ["together ai", "together.ai"],
+    "replicate": ["replicate"],
+    "modal": ["modal.com", "modal ai"],
 
     # 其他工具/产品
-    "bilibili": ["bilibili", "b站", "哔哩哔哩"],
-    "monica": ["monica"],
+    "bilibili": ["bilibili ai", "b站ai", "哔哩哔哩ai"],
+    "monica": ["monica ai"],
     "youmind": ["youmind"],
-    "jina": ["jina"],
+    "jina": ["jina ai"],
     "tavily": ["tavily"],
+    "perplexity": ["perplexity", "perplexity ai"],
+    "character": ["character.ai", "character ai"],
+    "poe": ["poe ai", "quora poe"],
 }
 
 # ============ 分区配置 ============
@@ -243,24 +292,38 @@ QUICK_JSON_PROMPT = textwrap.dedent("""
 请严格按照以下 JSON 格式输出，不要输出任何其他内容：
 
 {
-  "summary": "2-3句话的整体总结，概括本期速报的核心亮点和重要动态",
+  "summary": "2-3句话的整体总结，用【】标记重点词汇",
   "total": 3,
   "items": [
     {
       "category": "model",
       "title": "事件标题（一句话概括）",
-      "content": "详细内容，可以包含多个要点。",
+      "content": "详细内容，用【】标记核心亮点词汇。",
       "source_ids": [1, 3, 5]
     }
   ]
 }
 
 # 字段说明
-- summary: 整体总结，用2-3句话概括本期速报最重要的几个动态，让读者快速了解本期亮点
+- summary: 整体总结，用2-3句话概括本期速报最重要的几个动态
 - category: 必须是 model、product、tutorial、hardware、industry 之一
 - title: 事件标题，一句话概括
 - content: 详细内容，完整描述，不要省略
 - source_ids: 引用的原始推文编号列表
+
+# 重点标记规则
+在 summary 和 content 中，用中文方括号【】标记需要强调的重点词汇，例如：
+- 产品/模型名称：【Rodin Gen-2】、【Qwen3-Max】
+- 核心能力/特性：【局部和增量修改】、【自然语言编辑】
+- 重要数据/指标：【排名第一】、【提升50%】
+- 关键动作：【正式发布】、【开源】
+
+每条内容标记2-4个重点词即可，不要过度标记。标题不需要标记。
+
+# 链接保留规则
+- 如果原文中包含 GitHub 项目链接、产品官网、论文链接等有价值的 URL，必须在 content 中保留完整链接
+- 链接格式：在描述后附上链接，如"项目地址：https://github.com/xxx/xxx"
+- 不要省略或简化链接，保持原始完整 URL
 
 # 重要规则
 - 直接输出 JSON，不要有 ```json 标记或其他任何文字
@@ -810,6 +873,15 @@ class DigestAnalyzer:
         raw_events, aggregated_path = self.aggregator.gather(date=target_date)
         events = [Event(item) for item in raw_events]
 
+        # 统计信源数量（采集的总数，按来源类型分组）
+        source_stats = {"twitter": 0, "rss": 0}
+        for event in events:
+            source_type = event.source.lower() if event.source else "other"
+            if "twitter" in source_type:
+                source_stats["twitter"] += 1
+            elif "rss" in source_type:
+                source_stats["rss"] += 1
+
         if max_age is None:
             max_age = self.settings.default_max_age
 
@@ -838,8 +910,12 @@ class DigestAnalyzer:
             # 备用方案：将 AI 响应作为纯文本处理
             parsed = self._fallback_parse(ai_response, selected)
 
+        # 获取期数
+        issue_number = get_next_issue_number()
+        print(f"[quick_json] 本期期数: 第{issue_number}期")
+
         # 处理并补充品牌信息
-        result = self._process_json_result(parsed, selected)
+        result = self._process_json_result(parsed, selected, issue_number, source_stats)
 
         # 保存 JSON 文件
         json_path = self._save_web_json(result)
@@ -888,9 +964,13 @@ class DigestAnalyzer:
         }
 
     def _process_json_result(self, parsed: Dict[str, Any],
-                              selected: Sequence[Event]) -> Dict[str, Any]:
+                              selected: Sequence[Event],
+                              issue_number: int = 0,
+                              source_stats: Optional[Dict[str, int]] = None) -> Dict[str, Any]:
         """处理 AI 返回的 JSON，补充品牌信息和来源详情"""
         now = dt.datetime.now()
+        if source_stats is None:
+            source_stats = {"twitter": 0, "rss": 0}
 
         # 构建事件索引映射
         event_map = {idx + 1: event for idx, event in enumerate(selected)}
@@ -962,7 +1042,10 @@ class DigestAnalyzer:
 
         return {
             "generated_at": now.strftime("%Y-%m-%d %H:%M:%S"),
-            "date_display": now.strftime("%Y年%m月%d日"),
+            "generated_time": now.strftime("%H:%M"),
+            "date_display": now.strftime("%Y-%m-%d"),
+            "issue_number": issue_number,
+            "source_stats": source_stats,
             "summary": parsed.get("summary", ""),  # AI 生成的整体总结
             "total": len(processed_items),
             "items": processed_items,

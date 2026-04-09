@@ -64,7 +64,7 @@ def run_quick_image_mode(page_url: str = None, skip_collect: bool = False):
         # 使用指定的 URL
         from src.renderer.screenshot import ScreenshotRenderer
         with ScreenshotRenderer(width=390, device_scale_factor=2) as renderer:
-            screenshot_path = renderer.capture(page_url)
+            screenshot_path = renderer.capture(page_url, format="png")
     else:
         # 提示用户需要配置 URL
         print("提示：需要配置网页服务才能截图")

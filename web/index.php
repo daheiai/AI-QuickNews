@@ -6,8 +6,15 @@
 
 require_once __DIR__ . '/config.php';
 
-// 加载数据
-$data = load_quick_data();
+// 支持通过 URL 参数加载历史版本
+$file_param = $_GET['file'] ?? null;
+if ($file_param && preg_match('/^quick_\d{4}-\d{2}-\d{2}_\d{4}$/', $file_param)) {
+    // 加载指定的历史文件
+    $data = load_quick_data($file_param . '.json');
+} else {
+    // 加载最新版本
+    $data = load_quick_data();
+}
 
 if (!$data) {
     die('无法加载数据');
@@ -201,6 +208,9 @@ function render_highlights($text) {
             <div>由人工大黑制作</div>
             <div class="footer-source">
                 经由 <?php echo $twitter_count; ?> 条推特信源、<?php echo $rss_count; ?> 条RSS信源生成
+            </div>
+            <div class="footer-history">
+                <a href="history.php">历史期刊</a>
             </div>
         </footer>
     </div>

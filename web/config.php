@@ -265,14 +265,60 @@ $CATEGORIES = [
 
 /**
  * 加载快讯 JSON 数据
+ * @param string|null $filename 指定文件名，null 则加载 latest
  */
-function load_quick_data() {
-    if (!file_exists(QUICK_LATEST_JSON)) {
+function load_quick_data($filename = null) {
+    if ($filename) {
+        $path = WEB_JSON_DIR . '/' . $filename;
+    } else {
+        $path = QUICK_LATEST_JSON;
+    }
+
+    if (!file_exists($path)) {
         return null;
     }
 
-    $content = file_get_contents(QUICK_LATEST_JSON);
+    $content = file_get_contents($path);
     return json_decode($content, true);
+}
+
+/**
+ * 获取所有历史快讯文件列表
+ * @return array 按时间倒序排列的文件信息
+ */
+function get_history_list() {
+    $files = glob(WEB_JSON_DIR . '/quick_????-??-??_????.json');
+    $history = [];
+
+    foreach ($files as $file) {
+        $filename = basename($file);
+        // 解析文件名: quick_2025-01-30_1430.json
+        if (preg_match('/^quick_(\d{4}-\d{2}-\d{2})_(\d{2})(\d{2})\.json$/', $filename, $matches)) {
+            $date = $matches[1];
+            $hour = $matches[2];
+            $minute = $matches[3];
+
+            // 读取文件获取期号
+            $content = file_get_contents($file);
+            $data = json_decode($content, true);
+            $issue_number = $data['issue_number'] ?? '?';
+
+            $history[] = [
+                'filename' => str_replace('.json', '', $filename),
+                'date' => $date,
+                'time' => $hour . ':' . $minute,
+                'issue_number' => $issue_number,
+                'sort_key' => $date . '_' . $hour . $minute
+            ];
+        }
+    }
+
+    // 按时间倒序排列
+    usort($history, function($a, $b) {
+        return strcmp($b['sort_key'], $a['sort_key']);
+    });
+
+    return $history;
 }
 
 /**

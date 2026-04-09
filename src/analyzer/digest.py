@@ -69,7 +69,7 @@ BRAND_KEYWORDS = {
     "kimi": ["kimi", "moonshot", "月之暗面", "kimi chat"],
     "minimax": ["minimax", "海螺ai", "hailuo ai", "海螺视频", "M2.1", "M2", "M2.2"],
     "zhipu": ["zhipu", "智谱", "chatglm", "glm-4", "glm-3", "智谱清言","GLM"],
-    "baidu": ["baidu ai", "百度ai", "ernie", "文心一言", "文心大模型"],
+    "baidu": ["baidu ai", "百度ai", "百度", "ernie", "文心一言", "文心大模型"],
     "doubao": ["doubao", "豆包", "字节豆包"],
     "bytedance": ["bytedance ai", "字节跳动ai"],
     "hunyuan": ["hunyuan", "混元", "腾讯混元", "腾讯ai"],
@@ -445,36 +445,28 @@ def extract_json_from_text(text: str) -> Optional[Dict[str, Any]]:
 
 
 def match_brands(text: str, title: str = "") -> List[str]:
-    """从文本中匹配品牌（大小写不敏感）
+    """从标题中匹配品牌（大小写不敏感）
 
     Args:
-        text: 完整文本（标题+内容）
-        title: 标题文本，用于优先排序
+        text: 完整文本（未使用，保留参数兼容）
+        title: 标题文本，仅匹配标题中出现的品牌
 
     Returns:
-        品牌列表，标题中出现的品牌排在前面
+        标题中匹配到的品牌列表
     """
-    text_lower = text.lower()
-    title_lower = title.lower() if title else ""
+    if not title:
+        return []
+    title_lower = title.lower()
 
-    title_brands = []  # 标题中匹配到的品牌
-    content_brands = []  # 仅在内容中匹配到的品牌
-
+    brands = []
     for brand, keywords in BRAND_KEYWORDS.items():
         for keyword in keywords:
-            keyword_lower = keyword.lower()
-            if keyword_lower in text_lower:
-                # 检查是否在标题中出现
-                if title_lower and keyword_lower in title_lower:
-                    if brand not in title_brands:
-                        title_brands.append(brand)
-                else:
-                    if brand not in content_brands and brand not in title_brands:
-                        content_brands.append(brand)
+            if keyword.lower() in title_lower:
+                if brand not in brands:
+                    brands.append(brand)
                 break
 
-    # 标题中的品牌优先
-    return title_brands + content_brands
+    return brands
 
 
 def detect_category(text: str) -> str:

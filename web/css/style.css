@@ -257,6 +257,20 @@ strong {
     margin-top: 4px;
 }
 
+.footer-history {
+    margin-top: 12px;
+}
+
+.footer-history a {
+    font-size: 10px;
+    color: #bbb;
+    text-decoration: none;
+}
+
+.footer-history a:hover {
+    color: #888;
+}
+
 /* --- 打印/截图优化 --- */
 @media print {
     body {

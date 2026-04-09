@@ -98,15 +98,36 @@ AI总结：谷歌推出的工具会大幅降低企业级知识库部署门槛，
 """).strip()
 
 DEFAULT_DAILY_PROMPT = textwrap.dedent("""
-你是一名AI行业观察员。
-以下是一批过去24小时内的AI相关推文摘要（JSON数组）。你需要对它们按主题归纳主要事件
-或观点（比如：新模型发布、AI绘图争议、应用工具热度）。
+# 角色
 
-要求：
-- 用"人写日报"的语气，而非AI总结的口吻。
-- 每节加上小标题与表情符号。
-- 保留关键信息，但可适当合并冗余。
-- 总字数控制在800~1200字。
+你是一位在科技圈备受推崇的专栏主笔和思想者。对待大量的AI科技新闻有着独特的见解，更加擅长将复杂的技术概念和产业趋势，用平实睿智、循循善诱的语言解读给广大的科技爱好者。
+
+# 任务
+
+以下是一批过去24小时内的AI相关推文摘要（JSON数组）。请你据此撰写一篇完整、可直接发布的AI日报。日报必须具有清晰的主题线、信息逻辑与思考温度，像一个真正的人在说话，而不是AI在汇报。
+你需要对它们按主题归纳主要事件或观点（比如：新模型发布、AI绘图争议、应用工具热度）。
+
+# 目标读者与风格
+
+- **目标读者**：普通中文科技爱好者，对科技领域有热情和好奇心。
+- **核心风格**：平实睿智、有启发性、发人深省、吸引人。语言有独立的逻辑和美感，避免生硬地转述原文。
+
+# 判断逻辑（按优先级）
+1、新开源模型（关键词：release, Open source, 开源, 发布, SOTA ,Qwen,GLM 等开源模型发布或更新）
+2、商业大模型更新（关键词：ChatGPT, Claude, Gemini, Grok, Kimi, MiniMax等闭源模型动态）
+3、模型实测结论（关键词：对比, 跑测试, 实测, 差距, ）
+3、AI产品/工具发布与更新（关键词：API，推出，试玩, YouMind, Sora, Codex ，等AI工具动态）
+4、github开源项目（关键词：star, 工具, 开源, 分享, 爆火 ,含有github.com链接）
+5、提示词创新（出现prompt，实用性工具性的提示词模板）
+6、机器人/硬件相关（关键词：Boston Dynamics, Figure, Optimus ,树莓派 等）
+7、重大软件的更新（关键词：Chrome、Vscode等）
+                                       
+
+# 具体要求：
+- 通读提供的所有信源消息，精准识别重要的内容，并内化其核心论点、关键洞察、整体基调。不重要的水文大胆剔除，只留最重要的部分。
+- 构思钩子： 基于你对AI领域的理解，设计一个引人入胜的开篇。
+- 精准概括描述今日AI界发生的要点，要点之间构建逻辑不生硬。
+- 总字数控制在600~1000字。
 - 禁止使用markdown格式，以聊天软件易读的方式换行。
 """).strip()
 
@@ -441,24 +462,21 @@ class DigestAnalyzer:
             sections.extend(["【其他来源】", *grouped["other"], ""])
         return "\n".join(sections).rstrip()
 
-    def find_latest_available_date(self) -> str:
-        """查找已有数据的最近日期"""
-        latest_date = None
-        for candidate in config.TWEETS_DIR.glob("tweets_*.jsonl"):
-            match = re.match(r"tweets_(\d{4}-\d{2}-\d{2})\.jsonl$", candidate.name)
-            if not match:
-                continue
-            try:
-                current_date = dt.datetime.strptime(match.group(1), "%Y-%m-%d").date()
-            except ValueError:
-                continue
-            if latest_date is None or current_date > latest_date:
-                latest_date = current_date
+    def _resolve_daily_date(self, explicit_date: Optional[str]) -> str:
+        if explicit_date:
+            return explicit_date
 
-        if latest_date is None:
-            raise FileNotFoundError("未找到可用的历史数据文件")
+        yesterday = (dt.datetime.now() - dt.timedelta(days=1)).strftime("%Y-%m-%d")
+        if self._has_any_source_for_date(yesterday):
+            return yesterday
+        raise FileNotFoundError(
+            f"未找到昨天({yesterday})的 Twitter/RSS 数据，请先运行采集任务。"
+        )
 
-        return latest_date.isoformat()
+    def _has_any_source_for_date(self, date_str: str) -> bool:
+        twitter_file = config.TWEETS_DIR / f"tweets_{date_str}.jsonl"
+        rss_file = config.RSS_DIR / f"rss_{date_str}.jsonl"
+        return twitter_file.exists() or rss_file.exists()
 
     def run(self, date: Optional[str] = None, limit: Optional[int] = None,
             max_age: Optional[int] = None):
@@ -466,7 +484,7 @@ class DigestAnalyzer:
         if self.mode == "quick":
             target_date = None
         else:
-            target_date = date or self.find_latest_available_date()
+            target_date = self._resolve_daily_date(date)
 
         raw_events, aggregated_path = self.aggregator.gather(date=target_date)
 

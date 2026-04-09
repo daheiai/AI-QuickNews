@@ -24,8 +24,23 @@ SCREENSHOTS_DIR = DATA_DIR / "screenshots"  # 截图输出目录
 # Web 目录
 WEB_DIR = BASE_DIR / "web"
 
+# GitHub Changelog 配置
+GITHUB_DIR = SOURCES_DIR / "github"
+CHANGELOG_JSON_DIR = WEB_JSON_DIR / "changelog"
+GITHUB_CHECK_INTERVAL_HOURS = int(os.getenv("GITHUB_CHECK_INTERVAL_HOURS", "12"))
+GITHUB_API_TOKEN = os.getenv("GITHUB_API_TOKEN", "")  # 可选，提高 API 限额
+
+# GitHub 仓库列表
+GITHUB_REPOS = [
+    {"owner": "anthropics", "repo": "claude-code", "name": "Claude Code"},
+    {"owner": "anomalyco", "repo": "opencode", "name": "OpenCode"},
+    {"owner": "openclaw", "repo": "openclaw", "name": "OpenClaw"},
+    {"owner": "google-gemini", "repo": "gemini-cli", "name": "Gemini CLI"},
+    {"owner": "openai", "repo": "codex", "name": "Codex"},
+]
+
 # 确保目录存在
-for path in (SOURCES_DIR, EVENTS_DIR, TWITTER_DIR, RSS_DIR, REPORTS_DIR, LOGS_DIR, WEB_JSON_DIR, SCREENSHOTS_DIR):
+for path in (SOURCES_DIR, EVENTS_DIR, TWITTER_DIR, RSS_DIR, GITHUB_DIR, REPORTS_DIR, LOGS_DIR, WEB_JSON_DIR, CHANGELOG_JSON_DIR, SCREENSHOTS_DIR):
     path.mkdir(parents=True, exist_ok=True)
 
 # Twitter 配置
@@ -69,3 +84,18 @@ DAILY_DIGEST_LIMIT = int(os.getenv("DAILY_DIGEST_LIMIT", "60"))
 QUICK_DIGEST_MAX_AGE_HOURS = int(os.getenv("QUICK_DIGEST_MAX_AGE_HOURS", "48"))
 DIGEST_TEMPERATURE = float(os.getenv("DIGEST_TEMPERATURE", "0.2"))
 DIGEST_MAX_TOKENS = int(os.getenv("DIGEST_MAX_TOKENS", "4000"))
+
+# GitHub Changelog 配置
+GITHUB_DIR = SOURCES_DIR / "github"
+CHANGELOG_JSON_DIR = WEB_JSON_DIR / "changelog"
+GITHUB_CHECK_INTERVAL_HOURS = int(os.getenv("GITHUB_CHECK_INTERVAL_HOURS", "12"))
+GITHUB_API_TOKEN = os.getenv("GITHUB_API_TOKEN", "")  # 可选，提高 API 限额
+
+# GitHub 仓库列表
+GITHUB_REPOS = [
+    {"owner": "anthropics", "repo": "claude-code", "name": "Claude Code"},
+    {"owner": "anomalyco", "repo": "opencode", "name": "OpenCode"},
+    {"owner": "openclaw", "repo": "openclaw", "name": "OpenClaw"},
+    {"owner": "google-gemini", "repo": "gemini-cli", "name": "Gemini CLI"},
+    {"owner": "openai", "repo": "codex", "name": "Codex"},
+]

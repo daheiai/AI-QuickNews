@@ -1,0 +1,32 @@
+# 环境变量和敏感信息
+.env
+.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# 数据文件
+data/sources/**/*
+data/events/*.jsonl
+data/tweets/*.jsonl
+data/reports/*.md
+data/logs/*.log
+.last_check_time
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# 缓存
+.cache/
+*.cache

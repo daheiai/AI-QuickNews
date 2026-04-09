@@ -15,6 +15,7 @@ class EventAggregator:
     def __init__(self):
         self.twitter_dir = config.TWEETS_DIR
         self.rss_dir = config.RSS_DIR
+        self.github_dir = config.GITHUB_DIR
         self.events_dir = config.EVENTS_DIR
         self.events_dir.mkdir(parents=True, exist_ok=True)
 
@@ -23,6 +24,7 @@ class EventAggregator:
         events: List[dict] = []
         events.extend(self._load_twitter_events(date))
         events.extend(self._load_rss_events(date))
+        events.extend(self._load_github_events())
 
         seen_ids = set()
         deduped: List[dict] = []
@@ -150,6 +152,102 @@ class EventAggregator:
         }
 
     # ------------------------------------------------------------------
+    # GitHub Changelog 数据
+    def _load_github_events(self) -> List[dict]:
+        """从 changelog_all.json 加载最近的 release，转为事件"""
+        changelog_path = config.CHANGELOG_JSON_DIR / "changelog_all.json"
+        if not changelog_path.exists():
+            return []
+
+        try:
+            data = json.loads(changelog_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return []
+
+        # 只取最近 N 小时内发布的 release
+        cutoff_hours = getattr(config, "GITHUB_CHECK_INTERVAL_HOURS", 12)
+        cutoff = dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=cutoff_hours)
+
+        events = []
+        for repo in (data.get("repos") or {}).values():
+            for release in repo.get("releases") or []:
+                published = self._parse_datetime(release.get("published_at"))
+                if not published or published < cutoff:
+                    continue
+                converted = self._github_to_event(release, repo)
+                if converted:
+                    events.append(converted)
+        return events
+
+    def _github_to_event(self, release: dict, repo: dict) -> Optional[dict]:
+        """将 GitHub release 转为统一事件格式，内容压缩为简短摘要"""
+        rid = release.get("id", "")
+        if not rid:
+            return None
+
+        repo_name = repo.get("repo_name", "")
+        tag = release.get("tag_name", "")
+        url = release.get("url", "")
+        published_iso = self._normalize_datetime(release.get("published_at"))
+
+        # 从中文翻译内容提取前几条要点，限制长度
+        body = release.get("body_cn") or release.get("body_en") or ""
+        summary = self._compress_changelog(body, max_chars=300)
+
+        title = f"{repo_name} 发布 {tag}"
+        content = f"{repo_name} 发布了新版本 {tag}。{summary}"
+
+        return {
+            "id": f"github:{rid}",
+            "source": "github",
+            "source_name": repo_name,
+            "author": repo.get("owner", ""),
+            "title": title,
+            "summary": content,
+            "content": content,
+            "url": url,
+            "published_at": published_iso,
+            "score": 20,  # 给工具更新一个中等偏上的基础分
+            "metadata": {
+                "tag_name": tag,
+                "is_prerelease": release.get("is_prerelease", False),
+            },
+        }
+
+    @staticmethod
+    def _compress_changelog(body: str, max_chars: int = 300) -> str:
+        """从 changelog body 提取前几条要点，压缩为简短文本"""
+        if not body.strip():
+            return ""
+        lines = body.strip().splitlines()
+        points = []
+        for line in lines:
+            line = line.strip()
+            # 跳过标题行和空行
+            if not line or line.startswith("#") or line.startswith("##"):
+                continue
+            # 提取列表项
+            if line.startswith("- ") or line.startswith("* "):
+                point = line[2:].strip()
+                if point:
+                    points.append(point)
+        if not points:
+            # 没有列表项，取前两行非空内容
+            for line in lines:
+                line = line.strip()
+                if line and not line.startswith("#"):
+                    points.append(line)
+                    if len(points) >= 2:
+                        break
+
+        # 拼接并截断
+        result = "；".join(points[:5])
+        if len(result) > max_chars:
+            result = result[:max_chars] + "..."
+        return result
+
+    # ------------------------------------------------------------------
+    # 工具方法
     @staticmethod
     def _read_jsonl(path: Path) -> Iterable[dict]:
         with path.open("r", encoding="utf-8") as handle:

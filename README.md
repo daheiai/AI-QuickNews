@@ -4,8 +4,9 @@
 
 ## 功能特性
 
-- 🐦 **多源采集**：内置 Twitter + RSS，灵活扩展其他信源
+- 🐦 **多源采集**：内置 Twitter + RSS + GitHub Changelog，灵活扩展其他信源
 - 🤖 **AI 分析**：使用大模型生成快讯和日报
+- 🌐 **GitHub 监控**：自动抓取、翻译、总结 GitHub Releases
 - 📱 **飞书推送**：自动推送到飞书群聊
 - ⏰ **定时任务**：支持 cron 定时执行
 - 📊 **数据归档**：按日/周/月自动归档推文
@@ -26,9 +27,12 @@
 ├── data/                # 数据目录
 │   ├── sources/
 │   │   ├── twitter/     # Twitter 原始归档
-│   │   └── rss/         # RSS 原始归档
+│   │   ├── rss/         # RSS 原始归档
+│   │   └── github/      # GitHub Releases 原始归档
 │   ├── events/          # 聚合后的统一事件
 │   ├── reports/         # AI 报告
+│   ├── web-json/        # Web 展示用 JSON
+│   │   └── changelog/   # GitHub Changelog JSON
 │   └── logs/            # 日志文件
 └── scripts/             # 部署脚本
 ```
@@ -76,6 +80,11 @@ python main.py --mode quick
 python main.py --mode daily
 ```
 
+**GitHub Changelog 模式**（抓取 + 翻译 + 总结）：
+```bash
+python main.py --mode github
+```
+
 ### 4. 单独运行各模块
 
 ```bash
@@ -84,6 +93,9 @@ python -m src.collectors.twitter
 
 # 仅抓取 RSS
 python -m src.collectors.rss
+
+# 仅抓取 GitHub Changelog
+python -m src.collectors.github_changelog
 
 # 仅生成快讯
 python -m src.analyzer.digest --mode quick
@@ -116,6 +128,9 @@ source .env
 
 # 每天早上 7 点生成日报
 0 7 * * * cd /path/to/推特每日更新-claude && /usr/bin/python3 main.py --mode daily
+
+# 每 12 小时抓取 GitHub Changelog
+0 */12 * * * cd /path/to/推特每日更新-claude && /usr/bin/python3 main.py --mode github
 ```
 
 ## 配置说明
@@ -133,6 +148,12 @@ source .env
 - `RSS_LOOKBACK_HOURS`：只保留最近多少小时的内容（默认 4 小时）
 - `RSS_MAX_ITEMS_PER_FEED`：每个 RSS 最多抓取条数（默认 50）
 - `RSS_REQUEST_TIMEOUT`：单个 RSS 请求超时时间（秒，默认 10）
+
+### GitHub Changelog 配置
+
+- `GITHUB_CHECK_INTERVAL_HOURS`：检查间隔（默认 12 小时）
+- `GITHUB_API_TOKEN`：GitHub API Token（可选，提高 API 限额）
+- 监控的仓库在 `config.py` 的 `GITHUB_REPOS` 中配置
 
 ### AI 模型配置
 

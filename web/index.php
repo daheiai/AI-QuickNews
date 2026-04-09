@@ -366,7 +366,9 @@ $has_more = $total_issues > $initial_count;
 
             <div class="hero-buttons">
                 <a href="realtime.php" class="hero-btn hero-btn-primary">查看最新一期</a>
+                <a href="changelog.php" class="hero-btn hero-btn-secondary">AI工具速报</a>
                 <a href="rss.php" class="hero-btn hero-btn-secondary" target="_blank">RSS 订阅</a>
+                <a href="https://daheiai.com" class="hero-btn hero-btn-secondary" target="_blank">大黑的主页</a>
             </div>
         </section>
 
@@ -523,5 +525,6 @@ $has_more = $total_issues > $initial_count;
     })();
     </script>
 
+<script> var _mtj = _mtj || []; (function () { var mtj = document.createElement("script"); mtj.src = "https://node96.aizhantj.com:21233/tjjs/?k=qk25ajlrkia"; var s = document.getElementsByTagName("script")[0]; s.parentNode.insertBefore(mtj, s); })(); </script>
 </body>
 </html>

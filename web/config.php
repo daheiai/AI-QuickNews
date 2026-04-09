@@ -13,6 +13,11 @@ define('WEB_JSON_DIR', DATA_DIR . '/web-json');
 // JSON 数据文件路径
 define('QUICK_LATEST_JSON', WEB_JSON_DIR . '/quick_latest.json');
 
+// Changelog 数据目录
+define('CHANGELOG_JSON_DIR', WEB_JSON_DIR . '/changelog');
+define('CHANGELOG_ALL_JSON', CHANGELOG_JSON_DIR . '/changelog_all.json');
+define('CHANGELOG_TREND_JSON', CHANGELOG_JSON_DIR . '/changelog_trend.json');
+
 // Logo 配置
 define('LOGO_DIR', __DIR__ . '/images/logos');
 
@@ -361,4 +366,42 @@ function get_category_info($category) {
         return $CATEGORIES[$category];
     }
     return $CATEGORIES['industry'];
+}
+
+/**
+ * 加载 Changelog 汇总数据
+ */
+function load_changelog_data() {
+    if (!file_exists(CHANGELOG_ALL_JSON)) {
+        return null;
+    }
+    $content = file_get_contents(CHANGELOG_ALL_JSON);
+    return json_decode($content, true);
+}
+
+/**
+ * 加载 Changelog 趋势数据
+ */
+function load_changelog_trend() {
+    if (!file_exists(CHANGELOG_TREND_JSON)) {
+        return [];
+    }
+    $content = file_get_contents(CHANGELOG_TREND_JSON);
+    $data = json_decode($content, true);
+    return $data['trends'] ?? [];
+}
+
+/**
+ * 在 changelog 数据中按 ID 查找某条 release
+ */
+function find_release_by_id($data, $release_id) {
+    if (!$data || empty($data['repos'])) return null;
+    foreach ($data['repos'] as $repo) {
+        foreach ($repo['releases'] ?? [] as $release) {
+            if (($release['id'] ?? '') === $release_id) {
+                return ['repo' => $repo, 'release' => $release];
+            }
+        }
+    }
+    return null;
 }

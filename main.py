@@ -6,7 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import config
-from src.collectors import RSSCollector, TwitterCollector
+from src.collectors import RSSCollector, TwitterCollector, GitHubChangelogCollector
 from src.analyzer.digest import DigestAnalyzer
 from src.notifier.feishu import FeishuNotifier
 
@@ -197,6 +197,30 @@ def run_daily_mode():
     print("\n日报模式完成")
 
 
+def run_github_changelog_mode():
+    """GitHub Changelog 模式：抓取 -> 翻译 -> 汇总 JSON -> 生成趋势"""
+    print("=" * 50)
+    print("GitHub Changelog 模式启动")
+    print("=" * 50)
+
+    # 1. 抓取、翻译
+    print("\n[1/3] 抓取并翻译 GitHub Releases...")
+    collector = GitHubChangelogCollector()
+    collector.run()
+
+    # 2. 汇总生成 changelog_all.json
+    print("\n[2/3] 汇总生成 changelog_all.json...")
+    from src.generators.changelog_json import generate as generate_json
+    generate_json()
+
+    # 3. 生成趋势总结
+    print("\n[3/3] 生成更新趋势总结...")
+    from src.generators.changelog_trend import generate as generate_trend
+    generate_trend()
+
+    print("\nGitHub Changelog 模式完成")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="AI 信息聚合与推送系统",
@@ -218,9 +242,9 @@ def main():
     )
     parser.add_argument(
         "--mode",
-        choices=["quick", "quick_image", "daily"],
+        choices=["quick", "quick_image", "daily", "github"],
         required=True,
-        help="运行模式：quick=快讯文字版，quick_image=快讯图片版，daily=日报"
+        help="运行模式：quick=快讯文字版，quick_image=快讯图片版，daily=日报，github=GitHub Changelog"
     )
     parser.add_argument(
         "--page-url",
@@ -242,6 +266,8 @@ def main():
                 page_url=args.page_url,
                 skip_collect=args.skip_collect
             )
+        elif args.mode == "github":
+            run_github_changelog_mode()
         else:
             run_daily_mode()
     except Exception as e:

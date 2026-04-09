@@ -1,236 +1,527 @@
 <?php
 /**
- * AI 快讯网页渲染
- * 简约报刊风格
+ * AI 快讯 Landing Page
+ * 瀑布流展示多期速报，支持无限滚动加载
  */
 
 require_once __DIR__ . '/config.php';
 
-// 支持通过 URL 参数加载历史版本
-$file_param = $_GET['file'] ?? null;
-if ($file_param && preg_match('/^quick_\d{4}-\d{2}-\d{2}_\d{4}$/', $file_param)) {
-    // 加载指定的历史文件
-    $data = load_quick_data($file_param . '.json');
-} else {
-    // 加载最新版本
-    $data = load_quick_data();
-}
+// 获取历史速报列表
+$history = get_history_list();
+$total_issues = count($history);
 
-if (!$data) {
-    die('无法加载数据');
-}
+// 首次加载 20 期
+$initial_count = 20;
+$display_items = array_slice($history, 0, $initial_count);
 
-// 按分类分组
-$grouped_items = [];
-foreach ($data['items'] as $item) {
-    $cat = $item['category'] ?? 'industry';
-    if (!isset($grouped_items[$cat])) {
-        $grouped_items[$cat] = [];
-    }
-    $grouped_items[$cat][] = $item;
-}
+// 统计数据
+$latest_data = load_quick_data();
+$latest_issue = $latest_data['issue_number'] ?? $total_issues;
 
-// 分类排序优先级
-$category_order = ['model', 'product', 'tutorial', 'hardware', 'industry'];
+// 预加载首批卡片数据
+$cards = [];
+foreach ($display_items as $item) {
+    $data = load_quick_data($item['filename'] . '.json');
+    if (!$data) continue;
 
-// 收集本期所有提到的品牌（用于 Banner）
-$all_brands = [];
-foreach ($data['items'] as $item) {
-    if (!empty($item['brands'])) {
-        foreach ($item['brands'] as $brand) {
-            if (!in_array($brand, $all_brands)) {
-                $all_brands[] = $brand;
+    // 收集本期品牌
+    $brands = [];
+    $brand_logos = [];
+    foreach ($data['items'] ?? [] as $news_item) {
+        if (!empty($news_item['brands'])) {
+            foreach ($news_item['brands'] as $brand) {
+                if (!in_array($brand, $brands) && count($brands) < 5) {
+                    $brands[] = $brand;
+                    $logo = get_brand_logo($brand);
+                    if ($logo) {
+                        $brand_logos[] = ['brand' => $brand, 'logo' => $logo];
+                    }
+                }
             }
         }
     }
-}
-// 取前8个品牌用于背景展示
-$banner_brands = array_slice($all_brands, 0, 8);
 
-// 格式化日期时间显示
-$date_display = date('Y-m-d');
-$time_display = date('H:i');
-if (!empty($data['generated_at'])) {
-    $dt = DateTime::createFromFormat('Y-m-d H:i:s', $data['generated_at']);
-    if ($dt) {
-        $date_display = $dt->format('Y-m-d');
-        $time_display = $dt->format('H:i');
-    }
-}
-
-// 期数
-$issue_number = $data['issue_number'] ?? 504;
-
-// 信源统计
-$twitter_count = $data['source_stats']['twitter'] ?? 0;
-$rss_count = $data['source_stats']['rss'] ?? 0;
-
-/**
- * 格式化品牌名用于显示
- */
-function format_brand_name($brand) {
-    $special = [
-        'openai' => 'OpenAI',
-        'deepseek' => 'DeepSeek',
-        'chatglm' => 'ChatGLM',
-        'huggingface' => 'HuggingFace',
-        'xai' => 'xAI',
-        'minimax' => 'MiniMax',
-        'github' => 'GitHub',
-        'nvidia' => 'NVIDIA',
-        'zhipu' => 'Zhipu',
-        'qwen' => 'Qwen',
-        'kimi' => 'Kimi',
-        'claude' => 'Claude',
-        'gemini' => 'Gemini',
-        'mistral' => 'Mistral',
-        'meta' => 'Meta',
-        'bytedance' => 'ByteDance',
-        'alibaba' => 'Alibaba',
+    $cards[] = [
+        'filename' => $item['filename'],
+        'date' => $item['date'],
+        'time' => $item['time'],
+        'issue_number' => $data['issue_number'] ?? '?',
+        'summary' => str_replace(['【', '】'], ['', ''], $data['summary'] ?? ''),
+        'item_count' => count($data['items'] ?? []),
+        'brand_logos' => $brand_logos,
     ];
-
-    if (isset($special[strtolower($brand)])) {
-        return $special[strtolower($brand)];
-    }
-    return ucfirst($brand);
 }
 
-/**
- * 处理文本中的【】标记，转换为高亮
- */
-function render_highlights($text) {
-    // 将【xxx】转换为 <strong>xxx</strong>
-    return preg_replace('/【([^】]+)】/', '<strong>$1</strong>', htmlspecialchars($text));
-}
+$has_more = $total_issues > $initial_count;
 ?>
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>大黑AI速报</title>
+    <title>大黑AI速报 - 每4小时更新的AI行业快讯</title>
+    <meta name="description" content="AI 行业快讯速报，每4小时自动更新，涵盖模型动态、产品工具、技巧教程、硬件动态、行业资讯。">
     <link rel="stylesheet" href="css/style.css">
+    <link rel="alternate" type="application/rss+xml" title="大黑AI速报 RSS" href="rss.php">
+    <style>
+        /* Landing Page 专用样式 */
+        .landing-wrapper {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+            min-height: 100vh;
+            background: var(--bg-color);
+        }
+
+        /* Hero 区域 */
+        .hero {
+            text-align: center;
+            padding: 60px 20px 50px;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 40px;
+        }
+
+        .hero-avatar {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            margin-bottom: 20px;
+            border: 3px solid var(--border-color);
+        }
+
+        .hero-title {
+            font-family: "Noto Serif SC", "Songti SC", "SimSun", serif;
+            font-size: 2.2rem;
+            font-weight: 900;
+            color: var(--text-color);
+            margin: 0 0 12px 0;
+            letter-spacing: 2px;
+        }
+
+        .hero-subtitle {
+            font-size: 1.1rem;
+            color: var(--sub-text);
+            margin: 0 0 30px 0;
+            font-weight: 400;
+        }
+
+        .hero-stats {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            margin-bottom: 30px;
+        }
+
+        .hero-stat {
+            text-align: center;
+        }
+
+        .hero-stat-number {
+            font-family: "Noto Serif SC", "Songti SC", serif;
+            font-size: 2rem;
+            font-weight: 900;
+            color: var(--text-color);
+        }
+
+        .hero-stat-label {
+            font-size: 0.85rem;
+            color: var(--sub-text);
+            margin-top: 4px;
+        }
+
+        .hero-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .hero-btn {
+            display: inline-block;
+            padding: 12px 28px;
+            font-size: 0.95rem;
+            text-decoration: none;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+
+        .hero-btn-primary {
+            background: var(--text-color);
+            color: var(--bg-color);
+        }
+
+        .hero-btn-primary:hover {
+            opacity: 0.85;
+        }
+
+        .hero-btn-secondary {
+            background: transparent;
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+        }
+
+        .hero-btn-secondary:hover {
+            background: var(--banner-bg);
+        }
+
+        /* 瀑布流区域 */
+        .waterfall-section {
+            padding-bottom: 60px;
+        }
+
+        .waterfall-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .waterfall-title {
+            font-family: "Noto Serif SC", "Songti SC", serif;
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: var(--text-color);
+            margin: 0;
+        }
+
+        .waterfall-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+        }
+
+        @media (max-width: 900px) {
+            .waterfall-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 600px) {
+            .waterfall-grid {
+                grid-template-columns: 1fr;
+            }
+            .hero-stats {
+                gap: 24px;
+            }
+            .hero-stat-number {
+                font-size: 1.6rem;
+            }
+        }
+
+        /* 卡片样式 */
+        .card {
+            background: #fff;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            transition: all 0.2s;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+
+        .card:hover {
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            transform: translateY(-2px);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .card-issue {
+            font-family: "Noto Serif SC", "Songti SC", serif;
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: var(--text-color);
+        }
+
+        .card-time {
+            font-size: 0.8rem;
+            color: var(--sub-text);
+        }
+
+        .card-summary {
+            font-size: 0.9rem;
+            color: var(--text-color);
+            line-height: 1.6;
+            margin-bottom: 12px;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .card-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .card-logos {
+            display: flex;
+            gap: 6px;
+        }
+
+        .card-logo {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            object-fit: contain;
+            background: #f5f5f5;
+            padding: 2px;
+        }
+
+        .card-count {
+            font-size: 0.8rem;
+            color: var(--sub-text);
+        }
+
+        /* 加载指示器 */
+        .loading-indicator {
+            text-align: center;
+            padding: 30px;
+            color: var(--sub-text);
+            font-size: 0.9rem;
+        }
+
+        .loading-indicator.hidden {
+            display: none;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--border-color);
+            border-top-color: var(--text-color);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .no-more {
+            text-align: center;
+            padding: 30px;
+            color: var(--sub-text);
+            font-size: 0.85rem;
+        }
+
+        /* 页脚 */
+        .landing-footer {
+            text-align: center;
+            padding: 40px 20px;
+            border-top: 1px solid var(--border-color);
+            color: var(--sub-text);
+            font-size: 0.85rem;
+        }
+
+        .landing-footer a {
+            color: var(--sub-text);
+            text-decoration: none;
+        }
+
+        .landing-footer a:hover {
+            color: var(--text-color);
+        }
+
+        .footer-links-landing {
+            margin-top: 12px;
+        }
+
+        .footer-links-landing a {
+            margin: 0 12px;
+        }
+    </style>
 </head>
 <body>
 
-    <div class="mobile-wrapper">
-        <!-- 顶部 Banner -->
-        <header class="banner">
-            <!-- 背景 Logo（景深模糊）-->
-            <div class="banner-bg-logos-img">
-                <?php foreach ($banner_brands as $brand):
-                    $logo_url = get_brand_logo($brand);
-                    if ($logo_url):
-                ?>
-                <img src="<?php echo htmlspecialchars($logo_url); ?>"
-                     alt="<?php echo htmlspecialchars($brand); ?>"
-                     class="banner-logo-blur">
-                <?php
-                    endif;
-                endforeach;
-                ?>
+    <div class="landing-wrapper">
+        <!-- Hero 区域 -->
+        <section class="hero">
+            <img src="images/avatar-placeholder.svg" alt="大黑" class="hero-avatar">
+            <h1 class="hero-title">大黑AI速报</h1>
+            <p class="hero-subtitle">每 4 小时自动更新的 AI 行业快讯</p>
+
+            <div class="hero-stats">
+                <div class="hero-stat">
+                    <div class="hero-stat-number"><?php echo $latest_issue; ?></div>
+                    <div class="hero-stat-label">已更新期数</div>
+                </div>
+                <div class="hero-stat">
+                    <div class="hero-stat-number">4h</div>
+                    <div class="hero-stat-label">更新频率</div>
+                </div>
+                <div class="hero-stat">
+                    <div class="hero-stat-number">5</div>
+                    <div class="hero-stat-label">内容分类</div>
+                </div>
             </div>
 
-            <!-- 背景品牌文字 -->
-            <div class="banner-bg-logos">
-                <?php foreach ($banner_brands as $brand): ?>
-                <span><?php echo htmlspecialchars(format_brand_name($brand)); ?></span>
+            <div class="hero-buttons">
+                <a href="realtime.php" class="hero-btn hero-btn-primary">查看最新一期</a>
+                <a href="rss.php" class="hero-btn hero-btn-secondary" target="_blank">RSS 订阅</a>
+            </div>
+        </section>
+
+        <!-- 瀑布流区域 -->
+        <section class="waterfall-section">
+            <div class="waterfall-header">
+                <h2 class="waterfall-title">往期速报</h2>
+            </div>
+
+            <div class="waterfall-grid" id="waterfall-grid">
+                <?php foreach ($cards as $card): ?>
+                <a href="realtime.php?file=<?php echo htmlspecialchars($card['filename']); ?>" class="card">
+                    <div class="card-header">
+                        <span class="card-issue">第 <?php echo htmlspecialchars($card['issue_number']); ?> 期</span>
+                        <span class="card-time"><?php echo htmlspecialchars($card['date']); ?> <?php echo htmlspecialchars($card['time']); ?></span>
+                    </div>
+                    <div class="card-summary"><?php echo htmlspecialchars($card['summary']); ?></div>
+                    <div class="card-footer">
+                        <div class="card-logos">
+                            <?php foreach ($card['brand_logos'] as $bl): ?>
+                            <img src="<?php echo htmlspecialchars($bl['logo']); ?>"
+                                 alt="<?php echo htmlspecialchars($bl['brand']); ?>"
+                                 class="card-logo">
+                            <?php endforeach; ?>
+                        </div>
+                        <span class="card-count"><?php echo $card['item_count']; ?> 条快讯</span>
+                    </div>
+                </a>
                 <?php endforeach; ?>
             </div>
 
-            <!-- 右下角信息 -->
-            <div class="banner-info">
-                <img src="images/avatar-placeholder.svg" alt="大黑" class="banner-avatar">
-                <h1 class="banner-title">大黑AI速报</h1>
-                <p class="banner-date"><?php echo htmlspecialchars($date_display); ?> <?php echo htmlspecialchars($time_display); ?> · 第<?php echo $issue_number; ?>期</p>
+            <!-- 加载指示器 -->
+            <div class="loading-indicator hidden" id="loading-indicator">
+                <span class="loading-spinner"></span>加载中...
             </div>
-        </header>
 
-        <!-- AI 总结 -->
-        <?php if (!empty($data['summary'])): ?>
-        <section class="ai-summary">
-            <span class="section-label">◆ AI 总结</span>
-            <p class="summary-content"><?php echo render_highlights($data['summary']); ?></p>
+            <!-- 没有更多 -->
+            <div class="no-more hidden" id="no-more">已经到底啦</div>
         </section>
-        <?php endif; ?>
-
-        <!-- 分类内容 -->
-        <?php
-        foreach ($category_order as $cat_key) {
-            if (!isset($grouped_items[$cat_key]) || empty($grouped_items[$cat_key])) {
-                continue;
-            }
-
-            $cat_info = get_category_info($cat_key);
-            $items = $grouped_items[$cat_key];
-        ?>
-        <section class="content-block">
-            <h2 class="category-header"><?php echo htmlspecialchars($cat_info['name']); ?></h2>
-
-            <?php foreach ($items as $item): ?>
-            <article class="article-item">
-                <!-- Logo + 品牌关键词 -->
-                <?php if (!empty($item['brands'])): ?>
-                <div class="article-meta">
-                    <div class="article-logos">
-                        <?php foreach (array_slice($item['brands'], 0, 3) as $brand):
-                            $logo_url = get_brand_logo($brand);
-                            if ($logo_url):
-                        ?>
-                        <img src="<?php echo htmlspecialchars($logo_url); ?>"
-                             alt="<?php echo htmlspecialchars($brand); ?>"
-                             class="article-logo">
-                        <?php
-                            endif;
-                        endforeach;
-                        ?>
-                    </div>
-                    <span class="article-keywords">
-                        <?php echo htmlspecialchars(implode(' / ', array_map('format_brand_name', array_slice($item['brands'], 0, 3)))); ?>
-                    </span>
-                </div>
-                <?php endif; ?>
-
-                <!-- 标题 -->
-                <h3 class="article-title"><?php echo render_highlights($item['title']); ?></h3>
-
-                <!-- 内容 -->
-                <div class="article-body">
-                    <?php echo render_highlights($item['content']); ?>
-                </div>
-            </article>
-            <?php endforeach; ?>
-        </section>
-        <?php } ?>
 
         <!-- 页脚 -->
-        <footer class="footer">
-            <div>由<a href="https://daheiai.com/" target="_blank" class="footer-link-subtle">人工大黑</a>制作</div>
-            <div class="footer-source">
-                经由 <?php echo $twitter_count; ?> 条推特信源、<?php echo $rss_count; ?> 条RSS信源生成
+        <footer class="landing-footer">
+            <div>由 <a href="https://daheiai.com/" target="_blank">人工大黑</a> 制作</div>
+            <div class="footer-links-landing">
+                <a href="history.php">全部历史</a>
+                <a href="rss.php" target="_blank">RSS 订阅</a>
             </div>
-            <div class="footer-source">
-                访问 news.daheiai.com 在线查看本期日报
-            </div>
-            <div class="footer-links">
-                <a href="history.php">历史期刊</a>
-                <a onclick="document.getElementById('sources-panel').classList.toggle('active')">查看本期来源</a>
-            </div>
-            <?php if (!empty($data['all_sources'])): ?>
-            <div id="sources-panel" class="sources-panel">
-                <div class="sources-panel-title">本期来源（共 <?php echo count($data['all_sources']); ?> 条）</div>
-                <?php foreach ($data['all_sources'] as $src): ?>
-                <div class="source-item">
-                    <span class="source-type"><?php echo $src['source_type'] === 'twitter' ? '推特' : 'RSS'; ?></span>
-                    <span class="source-author"><?php echo htmlspecialchars($src['author']); ?></span>
-                    <span class="source-snippet"><?php echo htmlspecialchars($src['snippet']); ?></span>
-                    <a href="<?php echo htmlspecialchars($src['url']); ?>" target="_blank">查看原文</a>
-                </div>
-                <?php endforeach; ?>
-            </div>
-            <?php endif; ?>
         </footer>
     </div>
+
+    <script>
+    (function() {
+        // 无限滚动加载
+        const grid = document.getElementById('waterfall-grid');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const noMore = document.getElementById('no-more');
+
+        let offset = <?php echo $initial_count; ?>;
+        let loading = false;
+        let hasMore = <?php echo $has_more ? 'true' : 'false'; ?>;
+        const limit = 20;
+
+        // 创建卡片 HTML
+        function createCardHTML(card) {
+            let logosHTML = '';
+            if (card.brand_logos && card.brand_logos.length > 0) {
+                logosHTML = card.brand_logos.map(bl =>
+                    `<img src="${escapeHtml(bl.logo)}" alt="${escapeHtml(bl.brand)}" class="card-logo">`
+                ).join('');
+            }
+
+            return `
+                <a href="realtime.php?file=${encodeURIComponent(card.filename)}" class="card">
+                    <div class="card-header">
+                        <span class="card-issue">第 ${escapeHtml(card.issue_number)} 期</span>
+                        <span class="card-time">${escapeHtml(card.date)} ${escapeHtml(card.time)}</span>
+                    </div>
+                    <div class="card-summary">${escapeHtml(card.summary)}</div>
+                    <div class="card-footer">
+                        <div class="card-logos">${logosHTML}</div>
+                        <span class="card-count">${card.item_count} 条快讯</span>
+                    </div>
+                </a>
+            `;
+        }
+
+        // HTML 转义
+        function escapeHtml(text) {
+            if (text === null || text === undefined) return '';
+            const div = document.createElement('div');
+            div.textContent = String(text);
+            return div.innerHTML;
+        }
+
+        // 加载更多
+        async function loadMore() {
+            if (loading || !hasMore) return;
+
+            loading = true;
+            loadingIndicator.classList.remove('hidden');
+
+            try {
+                const response = await fetch(`api/cards.php?offset=${offset}&limit=${limit}`);
+                const result = await response.json();
+
+                if (result.success && result.data.length > 0) {
+                    result.data.forEach(card => {
+                        grid.insertAdjacentHTML('beforeend', createCardHTML(card));
+                    });
+
+                    offset += result.data.length;
+                    hasMore = result.meta.has_more;
+                }
+
+                if (!hasMore) {
+                    noMore.classList.remove('hidden');
+                }
+            } catch (error) {
+                console.error('加载失败:', error);
+            } finally {
+                loading = false;
+                loadingIndicator.classList.add('hidden');
+            }
+        }
+
+        // 滚动检测
+        function checkScroll() {
+            const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+            const windowHeight = window.innerHeight;
+            const docHeight = document.documentElement.scrollHeight;
+
+            // 距离底部 300px 时开始加载
+            if (scrollTop + windowHeight >= docHeight - 300) {
+                loadMore();
+            }
+        }
+
+        // 节流
+        let scrollTimer = null;
+        window.addEventListener('scroll', function() {
+            if (scrollTimer) return;
+            scrollTimer = setTimeout(function() {
+                scrollTimer = null;
+                checkScroll();
+            }, 100);
+        });
+
+        // 初始检查（如果页面不够长）
+        if (!hasMore) {
+            noMore.classList.remove('hidden');
+        } else {
+            checkScroll();
+        }
+    })();
+    </script>
 
 </body>
 </html>

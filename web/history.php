@@ -14,6 +14,7 @@ $history = get_history_list();
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>历史期刊 - 大黑AI速报</title>
     <link rel="stylesheet" href="css/style.css">
+    <link rel="alternate" type="application/rss+xml" title="大黑AI速报 RSS" href="rss.php">
     <style>
         .history-wrapper {
             width: 390px;
@@ -97,7 +98,7 @@ $history = get_history_list();
         <ul class="history-list">
             <?php foreach ($history as $item): ?>
             <li class="history-item">
-                <a href="index.php?file=<?php echo htmlspecialchars($item['filename']); ?>">
+                <a href="realtime.php?file=<?php echo htmlspecialchars($item['filename']); ?>">
                     <span class="history-date"><?php echo htmlspecialchars($item['date']); ?> <?php echo htmlspecialchars($item['time']); ?></span>
                     <span class="history-issue">第<?php echo htmlspecialchars($item['issue_number']); ?>期</span>
                 </a>
@@ -107,7 +108,9 @@ $history = get_history_list();
         <?php endif; ?>
 
         <div class="history-back">
-            <a href="index.php">返回最新</a>
+            <a href="realtime.php">返回最新</a>
+            <span style="margin: 0 8px; color: var(--sub-text);">·</span>
+            <a href="rss.php" target="_blank">RSS 订阅</a>
         </div>
     </div>
 

@@ -38,10 +38,19 @@ TWITTER_CHECK_INTERVAL_HOURS = int(os.getenv("TWITTER_CHECK_INTERVAL_HOURS", "4"
 TWITTER_MAX_PAGES = int(os.getenv("TWITTER_MAX_PAGES", "10"))
 
 # RSS 配置
-RSS_OPML_PATH = Path(os.getenv("RSS_OPML_PATH", BASE_DIR / "resources/rss_feeds.opml"))
+_rss_feeds_path = Path(os.getenv("RSS_FEEDS_PATH", "resources/rss_feeds.json"))
+RSS_FEEDS_PATH = _rss_feeds_path if _rss_feeds_path.is_absolute() else BASE_DIR / _rss_feeds_path
 RSS_LOOKBACK_HOURS = int(os.getenv("RSS_LOOKBACK_HOURS", "4"))
 RSS_MAX_ITEMS_PER_FEED = int(os.getenv("RSS_MAX_ITEMS_PER_FEED", "50"))
 RSS_REQUEST_TIMEOUT = int(os.getenv("RSS_REQUEST_TIMEOUT", "10"))
+RSS_MAX_WORKERS = int(os.getenv("RSS_MAX_WORKERS", "20"))
+
+# RSS AI 预处理配置（默认复用主模型）
+RSS_AI_MODEL = os.getenv("RSS_AI_MODEL", "") or os.getenv("OPENAI_MODEL", "deepseek-chat")
+RSS_AI_BASE_URL = os.getenv("RSS_AI_BASE_URL", "") or os.getenv("OPENAI_BASE_URL", "")
+RSS_AI_API_KEY = os.getenv("RSS_AI_API_KEY", "") or os.getenv("OPENAI_API_KEY", "")
+RSS_AI_BATCH_SIZE = int(os.getenv("RSS_AI_BATCH_SIZE", "20"))
+RSS_AI_MAX_TOKENS = int(os.getenv("RSS_AI_MAX_TOKENS", "2000"))
 
 # AI 模型配置
 OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "")

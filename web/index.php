@@ -133,7 +133,7 @@ function render_highlights($text) {
 
             <!-- 右下角信息 -->
             <div class="banner-info">
-                <img src="images/avatar-placeholder.svg" alt="AI QuickNews" class="banner-avatar">
+                <img src="images/avatar-placeholder.svg" alt="大黑" class="banner-avatar">
                 <h1 class="banner-title">大黑AI速报</h1>
                 <p class="banner-date"><?php echo htmlspecialchars($date_display); ?> <?php echo htmlspecialchars($time_display); ?> · 第<?php echo $issue_number; ?>期</p>
             </div>

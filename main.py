@@ -2,6 +2,7 @@
 import argparse
 import datetime as dt
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import config
@@ -10,16 +11,35 @@ from src.analyzer.digest import DigestAnalyzer
 from src.notifier.feishu import FeishuNotifier
 
 
+def _collect_sources():
+    """并行抓取 Twitter 和 RSS 数据"""
+    print("  并行启动 Twitter + RSS 采集...")
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        twitter_future = executor.submit(TwitterCollector().run)
+        rss_future = executor.submit(RSSCollector().run)
+        # 等待两个采集器都完成，收集异常
+        errors = []
+        for name, future in [("Twitter", twitter_future), ("RSS", rss_future)]:
+            try:
+                future.result()
+            except Exception as exc:
+                errors.append(f"{name}: {exc}")
+                print(f"  [警告] {name} 采集异常: {exc}")
+        if errors:
+            print(f"  采集完成（{len(errors)} 个源有异常）")
+        else:
+            print("  采集完成")
+
+
 def run_quick_mode():
     """快讯模式：抓取 -> 分析 -> 推送"""
     print("=" * 50)
     print("快讯模式启动")
     print("=" * 50)
 
-    # 1. 抓取多信源数据
+    # 1. 抓取多信源数据（并行）
     print("\n[1/3] 抓取多信源数据...")
-    TwitterCollector().run()
-    RSSCollector().run()
+    _collect_sources()
 
     # 2. 生成快讯
     print("\n[2/3] 生成 AI 快讯...")
@@ -44,11 +64,10 @@ def run_quick_image_mode(page_url: str = None, skip_collect: bool = False):
     print("快讯图片模式启动")
     print("=" * 50)
 
-    # 1. 抓取多信源数据（可选跳过）
+    # 1. 抓取多信源数据（可选跳过，并行）
     if not skip_collect:
         print("\n[1/4] 抓取多信源数据...")
-        TwitterCollector().run()
-        RSSCollector().run()
+        _collect_sources()
     else:
         print("\n[1/4] 跳过数据抓取（使用现有数据）")
 

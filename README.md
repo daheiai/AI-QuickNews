@@ -168,14 +168,6 @@ git checkout v009-add-history-page
 - 定时任务环境
 - 网页部署环境
 
-## 如果你对这个项目感兴趣
-
-如果你是从网页那边点进来的，或者你本身就在做 AI 信息流、日报系统、自动化内容产品，也欢迎继续看我别的项目和内容。
-
-- 我的主页：<https://daheiai.com/>
-- 这个日报系统在线效果：<https://news.daheiai.com>
-- 加群交流：<https://my.feishu.cn/wiki/MB6FwO9GyiGebykfeamcv4H3n5b>
-
 ## License
 
-MIT
+本项目使用 MIT License。你可以自由地使用、修改、分发和商业化这份代码，但仓库内容按当前状态提供，不附带任何明示或默示担保。具体条款见仓库根目录的 [LICENSE](LICENSE)。

@@ -1,16 +1,26 @@
-MIT License
+AI-QuickNews Personal / Non-Commercial License
 
 Copyright (c) 2026 daheiai
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+本项目源码默认仅授权用于个人学习、研究、演示、技术参考，以及非商业性质的修改和实验。
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+在遵守以下条件的前提下，你可以免费使用、复制、修改和分发本项目的代码：
+
+1. 使用目的仅限个人学习、研究或其他非商业用途。
+2. 保留原始版权声明与本许可文本。
+3. 不得暗示原作者为你的衍生项目、服务或观点背书。
+
+未经作者事先书面授权，以下行为均视为商业使用，默认不被允许：
+
+1. 将本项目或其修改版本用于收费产品、付费功能、订阅服务或其他商业化服务。
+2. 在企业、工作室、机构或组织的生产环境中使用本项目以支持业务运营。
+3. 基于本项目提供 SaaS、API、托管、代运营、咨询交付或其他对外商业服务。
+4. 售卖本项目源码、二次打包版本、课程、训练营、资料包，或以本项目为核心内容进行直接或间接变现。
+
+如需商业授权，请联系作者：
+
+- Homepage: https://daheiai.com/
+- Community: https://my.feishu.cn/wiki/MB6FwO9GyiGebykfeamcv4H3n5b
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,

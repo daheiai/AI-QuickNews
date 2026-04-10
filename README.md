@@ -1,41 +1,67 @@
-# AI 信息聚合与推送系统
+<div align="center">
 
-自动抓取 Twitter + RSS 等多信源的 AI 领域资讯，通过 AI 生成摘要，并推送到飞书群聊的自动化系统。
+# AI-QuickNews
 
-## 功能特性
+> *把 AI 圈每天最值得看的信息，自动抓下来，整理好，再稳定发出去。*
 
-- 🐦 **多源采集**：内置 Twitter + RSS + GitHub Changelog，灵活扩展其他信源
-- 🤖 **AI 分析**：使用大模型生成快讯和日报
-- 🌐 **GitHub 监控**：自动抓取、翻译、总结 GitHub Releases
-- 📱 **飞书推送**：自动推送到飞书群聊
-- ⏰ **定时任务**：支持 cron 定时执行
-- 📊 **数据归档**：按日/周/月自动归档推文
+[在线效果](https://news.daheiai.com) · [我的主页](https://daheiai.com/) · [加入交流](https://my.feishu.cn/wiki/MB6FwO9GyiGebykfeamcv4H3n5b)
 
-## 目录结构
+</div>
 
-```
+---
+
+这是我自己长期在跑的一套 AI 热点日报系统。
+
+它会持续抓取 Twitter、RSS、GitHub Changelog 等信源，把零散信息聚合起来，再交给 AI 做快讯、日报、更新日志整理，最后输出到网页和消息渠道。`news.daheiai.com` 上现在展示的，就是这套系统真实运行后的效果，不是单纯做出来摆着的 Demo。
+
+这个仓库不只是“某一版代码”，而是我把项目从最早期脚本、过渡阶段到后期完整版本，按时间点整理出来的一条历史链。你既可以直接拿最新版本部署，也可以回看我整个系统是怎么一步一步长出来的。
+
+## 在线效果
+
+- 项目运行效果：<https://news.daheiai.com>
+- 个人主页：<https://daheiai.com/>
+- 社群入口：<https://my.feishu.cn/wiki/MB6FwO9GyiGebykfeamcv4H3n5b>
+
+如果你平时也在关注 AI 资讯、做信息聚合、日报系统、AI 工作流，或者只是想看看一个真实跑起来的独立项目长什么样，这个仓库应该会对你有点参考价值。
+
+## 这个项目能做什么
+
+- 抓取多类 AI 信源：Twitter、RSS、GitHub Changelog
+- 把不同来源的信息统一整理成事件流
+- 用大模型生成快讯、日报、更新日志摘要
+- 输出网页展示页、历史页、RSS 等阅读入口
+- 支持飞书推送
+- 保留完整历史版本，方便回退和研究演进过程
+
+## 适合谁看
+
+- 想做 AI 日报、资讯聚合、自动化内容系统的人
+- 想看一个真实项目如何从脚本演化成完整系统的人
+- 想参考 Twitter/RSS/Changelog 多源聚合实现方式的人
+- 想把 AI 总结、网页展示、消息推送串起来的人
+
+## 仓库里有什么
+
+```text
 .
-├── main.py              # 主入口
-├── config.py            # 配置管理
-├── requirements.txt     # Python 依赖
-├── .env.example         # 环境变量模板
-├── src/                 # 源代码
-│   ├── collectors/      # 数据采集模块（Twitter、RSS 等）
-│   ├── aggregator/      # 多信源聚合模块
-│   ├── analyzer/        # AI 分析模块
-│   └── notifier/        # 通知模块
-├── data/                # 数据目录
-│   ├── sources/
-│   │   ├── twitter/     # Twitter 原始归档
-│   │   ├── rss/         # RSS 原始归档
-│   │   └── github/      # GitHub Releases 原始归档
-│   ├── events/          # 聚合后的统一事件
-│   ├── reports/         # AI 报告
-│   ├── web-json/        # Web 展示用 JSON
-│   │   └── changelog/   # GitHub Changelog JSON
-│   └── logs/            # 日志文件
-└── scripts/             # 部署脚本
+├── main.py                 # 主入口
+├── config.py               # 配置管理
+├── requirements.txt        # Python 依赖
+├── .env.example            # 环境变量模板
+├── retranslate_changelog.py
+├── src/                    # 核心源码
+│   ├── collectors/         # 信源采集
+│   ├── aggregator/         # 事件聚合
+│   ├── analyzer/           # AI 摘要生成
+│   ├── generators/         # Changelog 相关生成逻辑
+│   ├── notifier/           # 消息推送
+│   └── renderer/           # 截图与渲染
+├── resources/              # RSS 等资源文件
+└── web/                    # 网页展示层
 ```
+
+注意，这个公开仓库已经去掉了真实 `.env`、运行数据、截图、缓存和敏感信息。  
+所以你直接下载可以看源码、改逻辑、部署自己的版本，但要自己补环境变量配置。
 
 ## 快速开始
 
@@ -47,166 +73,117 @@ pip install -r requirements.txt
 
 ### 2. 配置环境变量
 
-复制 `.env.example` 为 `.env` 并填入你的配置：
-
 ```bash
 cp .env.example .env
 ```
 
-编辑 `.env` 文件，填入必要的 API 密钥：
+然后在 `.env` 里填好你自己的配置。
+
+最基本需要这些：
 
 ```bash
-# Twitter API
 TWITTER_API_KEY=your_twitter_api_key
-
-# AI 模型
 OPENAI_API_KEY=your_openai_api_key
-
-# 飞书
-FEISHU_APP_ID=your_app_id
-FEISHU_APP_SECRET=your_app_secret
-FEISHU_CHAT_ID=your_chat_id
+FEISHU_APP_ID=your_feishu_app_id
+FEISHU_APP_SECRET=your_feishu_app_secret
+FEISHU_CHAT_ID=your_feishu_chat_id
 ```
 
-### 3. 运行程序
+### 3. 运行
 
-**快讯模式**（抓取最新推文 + 生成快讯 + 推送）：
+快讯模式：
+
 ```bash
 python main.py --mode quick
 ```
 
-**日报模式**（生成昨日日报 + 推送）：
+日报模式：
+
 ```bash
 python main.py --mode daily
 ```
 
-**GitHub Changelog 模式**（抓取 + 翻译 + 总结）：
+GitHub Changelog 模式：
+
 ```bash
 python main.py --mode github
 ```
 
-### 4. 单独运行各模块
+## 主要能力说明
+
+### Twitter / RSS / GitHub Changelog 多源采集
+
+项目不是只抓一个来源，而是把不同信息源放在同一条流水线里处理。这样做的好处是，你最后拿到的不是碎片信息，而是更接近“今天 AI 圈发生了什么”的统一视角。
+
+### AI 摘要生成
+
+采集完原始信息后，系统会做筛选、排序、聚合，再交给大模型生成更适合人读的快讯、日报或 changelog 摘要。  
+这一步不是简单拼接文本，而是尽量把信息从“抓到了什么”变成“今天值得看什么”。
+
+### 网页展示
+
+后期版本里，项目已经不只是命令行工具，而是带完整网页展示层：
+
+- 主页
+- 实时页
+- 历史页
+- RSS 页面
+- Changelog 页面
+
+这也是为什么你可以直接在 `news.daheiai.com` 上看到最终运行效果。
+
+## 历史版本
+
+这个仓库保留了完整的项目演化历史，不是只传了最后一版。
+
+你可以直接看：
 
 ```bash
-# 仅抓取 Twitter
-python -m src.collectors.twitter
-
-# 仅抓取 RSS
-python -m src.collectors.rss
-
-# 仅抓取 GitHub Changelog
-python -m src.collectors.github_changelog
-
-# 仅生成快讯
-python -m src.analyzer.digest --mode quick
-
-# 仅推送到飞书
-python -m src.notifier.feishu --mode quick
+git log --oneline --decorate --graph
+git tag
 ```
 
-## 定时任务配置
+每个关键阶段我都打了 tag，例如：
 
-### 宝塔面板
+- `v0001-initial-twitter-monitor`
+- `v0007-add-rss-prototype`
+- `v004-add-rss`
+- `v009-add-history-page`
+- `v012-add-tool-monitoring`
+- `v014-add-reddit-monitoring`
 
-1. 进入「计划任务」
-2. 添加 Shell 脚本任务
-3. 执行周期：每 4 小时
-4. 脚本内容：
+如果你想回到某个历史时间点：
 
 ```bash
-#!/bin/bash
-cd /path/to/推特每日更新-claude
-source .env
-/usr/bin/python3 main.py --mode quick >> data/logs/cron.log 2>&1
+git checkout v009-add-history-page
 ```
 
-### Linux Crontab
+## 部署提醒
 
-```bash
-# 每 4 小时执行快讯
-0 */4 * * * cd /path/to/推特每日更新-claude && /usr/bin/python3 main.py --mode quick
+公开仓库里已经移除了：
 
-# 每天早上 7 点生成日报
-0 7 * * * cd /path/to/推特每日更新-claude && /usr/bin/python3 main.py --mode daily
+- 真实 `.env`
+- 日志
+- 运行数据
+- 截图
+- 缓存
+- 个人敏感资源
 
-# 每 12 小时抓取 GitHub Changelog
-0 */12 * * * cd /path/to/推特每日更新-claude && /usr/bin/python3 main.py --mode github
-```
+所以如果你要部署自己的版本，需要自己准备：
 
-## 配置说明
+- 各类 API key
+- 推送渠道配置
+- 定时任务环境
+- 网页部署环境
 
-### Twitter 配置
+## 如果你对这个项目感兴趣
 
-- `TWITTER_API_KEY`：Twitter API 密钥
-- `TWITTER_USERNAMES`：监控的用户列表（逗号分隔）
-- `TWITTER_CHECK_INTERVAL_HOURS`：抓取时间间隔（默认 4 小时）
-- `TWITTER_MAX_PAGES`：最大分页数（默认 10）
+如果你是从网页那边点进来的，或者你本身就在做 AI 信息流、日报系统、自动化内容产品，也欢迎继续看我别的项目和内容。
 
-### RSS 配置
+- 我的主页：<https://daheiai.com/>
+- 这个日报系统在线效果：<https://news.daheiai.com>
+- 加群交流：<https://my.feishu.cn/wiki/MB6FwO9GyiGebykfeamcv4H3n5b>
 
-- `RSS_OPML_PATH`：OPML 文件路径（默认 `resources/rss_feeds.opml`）
-- `RSS_LOOKBACK_HOURS`：只保留最近多少小时的内容（默认 4 小时）
-- `RSS_MAX_ITEMS_PER_FEED`：每个 RSS 最多抓取条数（默认 50）
-- `RSS_REQUEST_TIMEOUT`：单个 RSS 请求超时时间（秒，默认 10）
+## License
 
-### GitHub Changelog 配置
-
-- `GITHUB_CHECK_INTERVAL_HOURS`：检查间隔（默认 12 小时）
-- `GITHUB_API_TOKEN`：GitHub API Token（可选，提高 API 限额）
-- 监控的仓库在 `config.py` 的 `GITHUB_REPOS` 中配置
-
-### AI 模型配置
-
-- `OPENAI_BASE_URL`：API 端点
-- `OPENAI_API_KEY`：API 密钥
-- `OPENAI_MODEL`：模型名称
-- `DIGEST_TEMPERATURE`：采样温度（默认 0.2）
-- `DIGEST_MAX_TOKENS`：最大输出 token（默认 1200）
-
-### 飞书配置
-
-- `FEISHU_APP_ID`：飞书应用 ID
-- `FEISHU_APP_SECRET`：飞书应用密钥
-- `FEISHU_CHAT_ID`：目标群聊 ID
-
-## 扩展其他信源
-
-新增信源时，只需：
-
-1. 在 `src/collectors/` 下实现新的采集器，将原始数据写入 `data/sources/<source-name>/`；
-2. 在 `EventAggregator` 中补充该信源的格式转换逻辑；
-3. 在 `main.py` 中串联采集器（或单独运行该模块）。
-
-聚合后的统一 JSONL 位于 `data/events/`，分析器会自动读取所有来源并排序、去重。
-
-## 常见问题
-
-### 1. 路径问题导致写入失败
-
-确保使用绝对路径。`config.py` 已自动处理路径问题，所有数据都会写入 `data/` 目录。
-
-### 2. 环境变量未生效
-
-在服务器上运行时，需要在脚本中显式加载 `.env`：
-
-```bash
-export $(cat .env | xargs) && python main.py --mode quick
-```
-
-或使用 `python-dotenv`：
-
-```python
-from dotenv import load_dotenv
-load_dotenv()
-```
-
-### 3. 飞书推送失败
-
-检查：
-- 飞书应用是否开启了机器人能力
-- `FEISHU_CHAT_ID` 是否正确
-- 应用是否已添加到目标群聊
-
-## 许可证
-
-MIT License
+MIT

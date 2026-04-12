@@ -15,7 +15,7 @@ from src.aggregator.events import EventAggregator
 
 # ============ 期数计数器 ============
 ISSUE_COUNTER_FILE = config.DATA_DIR / "issue_counter.json"
-ISSUE_START_NUMBER = 504  # 起始期数
+ISSUE_START_NUMBER = config.ISSUE_START_NUMBER
 
 
 def get_next_issue_number() -> int:
@@ -680,9 +680,9 @@ class DigestAnalyzer:
         try:
             msg = (data.get("choices") or [{}])[0].get("message") or {}
             content = (msg.get("content") or "")
-            reasoning = (msg.get("reasoning") or "")
+            reasoning = (msg.get("reasoning") or msg.get("reasoning_content") or "")
             if not content.strip() and reasoning.strip():
-                print(f"[ai_debug] content 为空，但 reasoning 非空 (len={len(reasoning)}). 将使用 reasoning 作为降级输出")
+                print(f"[ai_debug] content 为空，但 reasoning 字段非空 (len={len(reasoning)}). 将使用 reasoning 作为降级输出")
                 content = reasoning
             if not content.strip():
                 print(f"[ai_debug] content/reasoning 均为空。response keys={list(data.keys())} choices0_keys={list(((data.get('choices') or [{}])[0]) .keys())}")
@@ -962,16 +962,15 @@ class DigestAnalyzer:
         parsed = extract_json_from_text(ai_response)
 
         if parsed is None:
-            print(f"[警告] AI 未返回有效 JSON，尝试使用备用解析")
-            print(f"[警告] AI 原始响应: {ai_response[:500]}")
-            # 备用方案：将 AI 响应作为纯文本处理
-            parsed = self._fallback_parse(ai_response, selected)
+            print(f"[错误] AI 未返回有效 JSON")
+            print(f"[错误] AI 原始响应: {ai_response[:500]}")
+            raise ValueError("AI 未返回有效 JSON，停止保存快讯。")
 
-        # 获取期数
-        issue_number = get_next_issue_number()
-        print(f"[quick_json] 本期期数: 第{issue_number}期")
+        self._validate_quick_json(parsed)
 
         # 处理并补充品牌信息
+        issue_number = get_next_issue_number()
+        print(f"[quick_json] 本期期数: 第{issue_number}期")
         result = self._process_json_result(parsed, selected, issue_number, source_stats)
 
         # 保存 JSON 文件
@@ -980,6 +979,21 @@ class DigestAnalyzer:
         print(f"[quick_json] JSON 已写入 {json_path}")
 
         return result
+
+    def _validate_quick_json(self, parsed: Dict[str, Any]) -> None:
+        """保存前校验快讯 JSON，避免空结果污染期数和历史文件。"""
+        items = parsed.get("items")
+        if not isinstance(items, list) or not items:
+            raise ValueError("AI 未生成有效快讯，停止保存快讯。")
+
+        valid_items = [
+            item for item in items
+            if isinstance(item, dict) and (item.get("title") or item.get("content"))
+        ]
+        if not valid_items:
+            raise ValueError("AI 未生成有效快讯，停止保存快讯。")
+
+        parsed["items"] = valid_items
 
     def _fallback_parse(self, ai_response: str, selected: Sequence[Event]) -> Dict[str, Any]:
         """备用解析：当 AI 未返回有效 JSON 时，从文本中提取信息"""

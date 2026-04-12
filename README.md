@@ -63,6 +63,14 @@
 pip install -r requirements.txt
 ```
 
+如果要使用 `web/` 目录里的网页展示层，还需要准备 PHP 运行环境。常见部署方式是：
+
+- Nginx + PHP-FPM
+- Apache + PHP
+- 本地调试可用 `php -S 127.0.0.1:8000 -t web`
+
+网页层会读取 Python 任务生成的 `data/web-json/quick_latest.json`、历史快讯 JSON 和 changelog JSON，所以需要先跑过对应的 Python 生成任务，网页才会有数据。
+
 ### 2. 配置环境变量
 
 ```bash
@@ -80,6 +88,17 @@ FEISHU_APP_ID=your_feishu_app_id
 FEISHU_APP_SECRET=your_feishu_app_secret
 FEISHU_CHAT_ID=your_feishu_chat_id
 ```
+
+可选配置里建议按自己的部署情况调整：
+
+```bash
+OPENAI_BASE_URL=https://api.openai.com/v1
+OPENAI_MODEL=gpt-4o-mini
+DIGEST_MAX_TOKENS=4000
+ISSUE_START_NUMBER=1
+```
+
+`ISSUE_START_NUMBER` 是快讯期数的起始值。新部署且没有 `data/issue_counter.json` 时，第一期会从这个值开始；如果已经存在计数器文件，则继续沿用文件里的期数。
 
 ### 3. 运行
 

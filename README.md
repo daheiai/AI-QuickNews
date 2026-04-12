@@ -94,7 +94,7 @@ FEISHU_CHAT_ID=your_feishu_chat_id
 ```bash
 OPENAI_BASE_URL=https://api.openai.com/v1
 OPENAI_MODEL=gpt-4o-mini
-DIGEST_MAX_TOKENS=4000
+DIGEST_MAX_TOKENS=8000
 ISSUE_START_NUMBER=1
 ```
 
